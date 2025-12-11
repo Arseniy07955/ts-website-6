@@ -1,0 +1,38 @@
+{layout "layout.latte"}
+
+{block content}
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Edit Configuration</h5>
+            <form method="post">
+                {$csrfField}
+
+                {foreach $configItems as $key => $value}
+                    <div class="form-group row">
+                        <label for="config_{$key}" class="col-sm-3 col-form-label">{$key}</label>
+                        <div class="col-sm-9">
+                            {if is_bool($value)}
+                                <select class="form-control" id="config_{$key}" name="{$key}">
+                                    <option value="true" {if $value}selected{/if}>True</option>
+                                    <option value="false" {if !$value}selected{/if}>False</option>
+                                </select>
+                            {elseif is_array($value)}
+                                {if $key === 'admin_uids'}
+                                    <input type="text" class="form-control" id="config_{$key}" name="{$key}" value="{implode(',', $value)}">
+                                    <small class="form-text text-muted">Comma separated list of UIDs</small>
+                                {else}
+                                    <textarea class="form-control" id="config_{$key}" name="{$key}" rows="3">{json_encode($value)}</textarea>
+                                    <small class="form-text text-muted">JSON format</small>
+                                {/if}
+                            {else}
+                                <input type="text" class="form-control" id="config_{$key}" name="{$key}" value="{$value}">
+                            {/if}
+                        </div>
+                    </div>
+                {/foreach}
+
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </form>
+        </div>
+    </div>
+{/block}

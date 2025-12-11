@@ -1,0 +1,76 @@
+{layout "layout.latte"}
+
+{block content}
+    <div class="card mb-4">
+        <div class="card-header">
+            Add FAQ
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {$csrfField}
+                <input type="hidden" name="action" value="add">
+                <div class="form-group">
+                    <label for="question">Question</label>
+                    <input type="text" class="form-control" id="question" name="question" required>
+                </div>
+                <div class="form-group">
+                    <label for="answer">Answer (HTML allowed)</label>
+                    <textarea class="form-control" id="answer" name="answer" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">Add FAQ</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Existing FAQs
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Question</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {foreach $faqList as $faq}
+                        <tr>
+                            <td>{$faq['faqid']}</td>
+                            <td>{$faq['question']}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" data-toggle="collapse" data-target="#editFaq{$faq['faqid']}">Edit</button>
+                                <form method="post" style="display:inline-block" onsubmit="return confirm('Are you sure?');">
+                                    {$csrfField}
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="faqid" value="{$faq['faqid']}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr class="collapse" id="editFaq{$faq['faqid']}">
+                            <td colspan="3">
+                                <form method="post">
+                                    {$csrfField}
+                                    <input type="hidden" name="action" value="edit">
+                                    <input type="hidden" name="faqid" value="{$faq['faqid']}">
+                                    <div class="form-group">
+                                        <label>Question</label>
+                                        <input type="text" class="form-control" name="question" value="{$faq['question']}" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Answer</label>
+                                        <textarea class="form-control" name="answer" rows="3" required>{$faq['answer']}</textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {/foreach}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{/block}

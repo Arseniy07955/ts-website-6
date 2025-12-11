@@ -13,6 +13,24 @@ class Auth {
         return self::getCldbid() !== null && self::getUid() !== null;
     }
 
+    /**
+     * Checks if the currently logged in user is an administrator
+     * @return bool
+     */
+    public static function isAdmin(): bool {
+        if (!self::isLoggedIn()) {
+            return false;
+        }
+
+        $adminUids = Config::get("admin_uids", []);
+
+        if (!is_array($adminUids)) {
+            return false;
+        }
+
+        return in_array(self::getUid(), $adminUids, true);
+    }
+
     public static function getUid(): ?string {
         return @$_SESSION["tsuser"]["uid"];
     }
