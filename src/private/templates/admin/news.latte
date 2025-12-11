@@ -1,0 +1,78 @@
+{layout "layout.latte"}
+
+{block content}
+    <div class="card mb-4">
+        <div class="card-header">
+            Add News
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {$csrfField}
+                <input type="hidden" name="action" value="add">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" class="form-control" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="content">Content (HTML allowed)</label>
+                    <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">Add News</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Existing News
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {foreach $newsList as $news}
+                        <tr>
+                            <td>{$news['newsId']}</td>
+                            <td>{$news['title']}</td>
+                            <td>{date('Y-m-d H:i', $news['added'])}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" data-toggle="collapse" data-target="#editNews{$news['newsId']}">Edit</button>
+                                <form method="post" style="display:inline-block" onsubmit="return confirm('Are you sure?');">
+                                    {$csrfField}
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="newsId" value="{$news['newsId']}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr class="collapse" id="editNews{$news['newsId']}">
+                            <td colspan="4">
+                                <form method="post">
+                                    {$csrfField}
+                                    <input type="hidden" name="action" value="edit">
+                                    <input type="hidden" name="newsId" value="{$news['newsId']}">
+                                    <div class="form-group">
+                                        <label>Title</label>
+                                        <input type="text" class="form-control" name="title" value="{$news['title']}" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Content</label>
+                                        <textarea class="form-control" name="content" rows="5" required>{$news['description']}</textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {/foreach}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{/block}

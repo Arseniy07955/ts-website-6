@@ -1,0 +1,19 @@
+{layout "layout.latte"}
+
+{block content}
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Edit Rules</h5>
+            <form method="post">
+                {$csrfField}
+
+                <div class="form-group">
+                    <label for="rules_content">Rules Content (HTML allowed)</label>
+                    <textarea class="form-control" id="rules_content" name="rules_content" rows="15">{$rulesContent}</textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Rules</button>
+            </form>
+        </div>
+    </div>
+{/block}
