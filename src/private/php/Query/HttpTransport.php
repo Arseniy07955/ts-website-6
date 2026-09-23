@@ -209,11 +209,17 @@ class HttpTransport extends \TeamSpeak3_Transport_Abstract {
         }
 
         $body = $json["body"] ?? [];
+        $extra = $json["status"]["extra_message"] ?? null;
+
+        // TS6 names the missing permission instead of sending its id
+        if (!empty($json["status"]["failed_permission"])) {
+            $extra = trim($extra . " failed on " . $json["status"]["failed_permission"]);
+        }
 
         return [
             "code" => (int) $json["status"]["code"],
             "message" => (string) ($json["status"]["message"] ?? ""),
-            "extra" => $json["status"]["extra_message"] ?? null,
+            "extra" => $extra,
             "body" => is_array($body) ? $body : [],
         ];
     }
