@@ -1,6 +1,7 @@
 <?php
 if(!defined("__TSWEBSITE_VERSION")) die("Direct access not allowed");
 
+use Wruczek\TSWebsite\Config;
 use Wruczek\TSWebsite\Utils\TeamSpeakUtils;
 
 $installerLockMessage =
@@ -70,59 +71,112 @@ if(!empty($_COOKIE["tsw_allow_metrics"])) {
     $response = file_get_contents($url, false, $context);
 
     if ($response !== "ok") {
-        echo "Error sending metrics :(";
+        $metricsError = true;
     }
 }
 ?>
-<div class="card">
-    <div class="card-body">
-        <h3 class="card-title text-center">TS-website <?= __TSWEBSITE_VERSION ?> has been successfully installed! &#x1F44D;</h3>
 
-        <p class="text-center">
-            If you wish, you can remove the <code>installer</code> directory.
-        </p>
+<header class="installer-head reveal">
+    <?= $stepChip ?>
+    <h1 class="page-title">TS-website is installed</h1>
+    <p class="page-sub">
+        Version <?= htmlspecialchars(__TSWEBSITE_VERSION) ?> is ready. If you wish, you can remove the
+        <code>installer</code> directory now.
+    </p>
+</header>
 
-        <br>
+<?php // What the website starts with, read back from the database. In pairs; on a phone the name
+      // and the address get a line each, the time zone and version share one when both fit ?>
+<dl class="cells installer-facts is-pairs reveal" style="--i: 1">
+    <div class="cell cell-wide">
+        <dt><?= installerIcon("house", "i-sm") ?>Website</dt>
+        <dd><?= htmlspecialchars((string) Config::get("website_title")) ?></dd>
+    </div>
+    <div class="cell cell-wide">
+        <dt><?= installerIcon("headset", "i-sm") ?>TeamSpeak address</dt>
+        <dd class="mono"><?= htmlspecialchars((string) Config::get("query_displayip")) ?></dd>
+    </div>
+    <div class="cell cell-fit">
+        <dt><?= installerIcon("clock", "i-sm") ?>Time zone</dt>
+        <dd><span class="cell-text"><?= htmlspecialchars((string) Config::get("timezone")) ?></span></dd>
+    </div>
+    <div class="cell cell-fit">
+        <dt><?= installerIcon("hard-drives", "i-sm") ?>Version</dt>
+        <dd><span class="cell-text"><?= htmlspecialchars(__TSWEBSITE_VERSION) ?></span></dd>
+    </div>
+</dl>
 
-        <h1 class="card-title text-center mb-4">What now?</h1>
-
-        <div class="col-lg-11" style="left: 4.166666666%">
-            <div class="row whatnow-row">
-                <div class="col-lg-2">
-                    <i class="fab fa-paypal whatnow-icon fa-fw" style="color: #003087"></i>
-                </div>
-                <div class="col-lg-10">
-                    <h1><a href="#" onclick="alert('If you\'d like to donate, send me a message via Telegram or email. Thanks!')" target="_blank">Donate</a></h1>
-                    <h3>to keep this project alive</h3>
-                </div>
-            </div>
-            <div class="row whatnow-row">
-                <div class="col-lg-10 text-right">
-                    <h1><a href="https://t.me/tswebsite" target="_blank">Join</a> <small>our telegram group</small></h1>
-                    <h3>news, announcements and support</h3>
-                </div>
-                <div class="col-lg-2">
-                    <i class="fab fa-telegram-plane whatnow-icon fa-fw" style="color: #0088cc"></i>
-                </div>
-            </div>
-            <div class="row whatnow-row">
-                <div class="col-lg-2">
-                    <i class="fa fa-eye whatnow-icon fa-fw" style="color: #fbb034"></i>
-                </div>
-                <div class="col-lg-10">
-                    <h1><a href="../">Visit</a> <small>your new website</small></h1>
-<!--                    <h3>or login to your <a href="../admin">Admin Panel</a></h3>-->
-                </div>
-            </div>
-            <div class="row whatnow-row">
-                <div class="col-lg-10 text-right">
-                    <h1>Spread <small>the message</small></h1>
-                    <h3>Let others know about this project</h3>
-                </div>
-                <div class="col-lg-2">
-                    <i class="fa fa-heart whatnow-icon fa-fw" style="color: #ff4d4d"></i>
-                </div>
-            </div>
+<div class="installer-body">
+    <?php if(!empty($metricsError)) { ?>
+        <div class="alert alert-warning has-icon reveal" style="--i: 2" role="alert">
+            <?= installerIcon("warning-circle", "alert-icon") ?>
+            The one-time statistics could not be sent. Nothing else is affected.
         </div>
+    <?php } ?>
+
+    <section class="reveal" style="--i: 2" aria-labelledby="whatnow-title">
+        <div class="block-head">
+            <h2 class="block-title" id="whatnow-title">What now?</h2>
+        </div>
+
+        <ul class="rows">
+            <li class="row-item">
+                <p class="row-label">Visit</p>
+                <p class="row-value"><a href="../">Open your new website</a></p>
+            </li>
+            <li class="row-item">
+                <p class="row-label">Join</p>
+                <p class="row-value">
+                    <a href="https://t.me/tswebsite" target="_blank" rel="noopener">The Telegram group</a>
+                    for news, announcements and support
+                </p>
+            </li>
+            <li class="row-item">
+                <p class="row-label">Donate</p>
+                <p class="row-value">To keep this project alive, send a message via Telegram or email if you would like to donate. Thanks!</p>
+            </li>
+            <li class="row-item">
+                <p class="row-label">Spread the word</p>
+                <p class="row-value">Let others know about this project</p>
+            </li>
+        </ul>
+    </section>
+
+    <div class="installer-actions reveal" style="--i: 3">
+        <a href="../" class="btn btn-primary">
+            Open the website<?= installerIcon("arrow-right", "i-arrow") ?>
+        </a>
     </div>
 </div>
+
+<?php ob_start(); ?>
+<section class="side-block reveal" style="--i: 1" aria-labelledby="notes-title">
+    <div class="side-head">
+        <h2 class="side-title" id="notes-title">Before you go</h2>
+    </div>
+
+    <ul class="howto">
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("trash") ?></span>
+            <div>
+                <p class="howto-title">Remove the installer</p>
+                <p class="howto-sub">The website does not need the <code>installer</code> directory. <code>private/INSTALLER_LOCK</code> already keeps it from running again</p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("database") ?></span>
+            <div>
+                <p class="howto-title">Settings live in the database</p>
+                <p class="howto-sub">There is no admin panel yet: change values in the <code><?= htmlspecialchars((string) (Config::i()->getDatabaseConfig()["prefix"] ?? "")) ?>config</code> table</p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("book-open-text") ?></span>
+            <div>
+                <p class="howto-title">Documentation</p>
+                <a class="howto-link" href="https://github.com/Wruczek/ts-website/wiki" target="_blank" rel="noopener">Wiki on GitHub<?= installerIcon("arrow-up-right", "i-sm") ?></a>
+            </div>
+        </li>
+    </ul>
+</section>
+<?php $pageNotes = ob_get_clean(); ?>

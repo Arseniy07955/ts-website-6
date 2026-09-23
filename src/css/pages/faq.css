@@ -1,0 +1,639 @@
+/* ==========================================================================
+   FAQ (faq.latte, js/faq.js): a title section with the search, then a split:
+   the questions as full-width lines between hairlines on the left, an index
+   of all questions and ways to get more help on the right
+   ========================================================================== */
+
+/* Title and search use the columns of the split below, so the search starts
+   exactly where the side column's content does (its 1px hairline + 40px) */
+.faq-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    align-items: end;
+    padding-inline: 0;
+}
+
+.faq-hero-text {
+    min-width: 0;
+    padding: 0 40px 0 var(--pad-x);
+}
+
+.faq-hero-tools {
+    min-width: 0;
+    padding: 0 40px 0 41px;
+}
+
+@media (max-width: 1000px) {
+    .faq-hero {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 32px;
+    }
+
+    .faq-hero-text,
+    .faq-hero-tools {
+        padding-inline: var(--pad-x);
+    }
+
+    .faq-hero-tools {
+        max-width: calc(560px + var(--pad-x) * 2);
+    }
+}
+
+/* Search */
+
+.faq-search {
+    position: relative;
+}
+
+/* 16px keeps phones from zooming into the field */
+.faq-search .form-control {
+    padding-left: 42px;
+    padding-right: 42px;
+    font-size: 16px;
+    text-overflow: ellipsis;
+}
+
+/* The clear button only shows once there is text, so the empty field gives its room to the
+   placeholder; where the column is narrow (about 1000-1100px) the hint still ends in an ellipsis */
+.faq-search .form-control:placeholder-shown {
+    padding-right: 14px;
+}
+
+/* The field has its own clear button */
+.faq-search .form-control::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.faq-search-icon {
+    position: absolute;
+    top: 50%;
+    left: 15px;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    color: var(--text-3);
+    pointer-events: none;
+    transition: color var(--dur-fast) ease;
+}
+
+.faq-search:focus-within .faq-search-icon {
+    color: var(--text);
+}
+
+.faq-search-clear {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-top: -16px;
+    border-radius: var(--radius-sm);
+    color: var(--text-3);
+    transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+
+.faq-search-clear:hover {
+    background: var(--bg-2);
+    color: var(--text);
+}
+
+.faq-search-clear .i {
+    width: 15px;
+    height: 15px;
+    vertical-align: 0;
+}
+
+/* The search needs JavaScript; without it only the count stays */
+html:not(.js) .faq-search {
+    display: none;
+}
+
+/* Quiet facts under the field: how many questions, when an answer last changed */
+.faq-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 24px;
+    margin-top: 12px;
+}
+
+.faq-fact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--text-3);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* What the search matched, in questions, answers and the index */
+.faq-mark {
+    margin: 0 -1px;
+    padding: 0 1px;
+    border-radius: 3px;
+    background: var(--selection);
+    color: inherit;
+}
+
+/* Questions */
+
+/* The first question starts on the line of the side column's first heading */
+.faq-main {
+    padding-top: 24px;
+}
+
+.faq-item {
+    position: relative;
+    isolation: isolate;
+    /* "#faqN" links land below the sticky header, with some air above the question */
+    scroll-margin-top: calc(var(--header-h) + 24px);
+}
+
+/* Hairlines only between the rows that are shown, whatever the search hides */
+.faq-item:not([hidden]) ~ .faq-item {
+    border-top: 1px solid var(--line);
+}
+
+/* Arriving through a "#faqN" link or the index the row is washed with the quiet fill,
+   which then fades away: the eye finds the question even when it sits too low to reach
+   the top. Same shape as the focus ring of the toggle: it bleeds 12px to the sides */
+.faq-item::before {
+    content: "";
+    position: absolute;
+    inset: 6px -12px;
+    z-index: -1;
+    border-radius: var(--radius);
+    background: var(--bg-2);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Held while the page settles, then dissolved; a rare moment, so longer than UI motion */
+.faq-item.is-found::before {
+    animation: faq-found 1200ms var(--ease-in-out) 600ms both;
+}
+
+@keyframes faq-found {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+.faq-q {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: -.015em;
+}
+
+/* The whole line is the button. It bleeds 12px to the sides so the focus ring clears the text */
+.faq-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    width: calc(100% + 24px);
+    margin: 0 -12px;
+    padding: 24px 12px;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.faq-toggle:focus-visible {
+    outline-offset: -2px;
+}
+
+.faq-q-body {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+
+.faq-q-text {
+    min-width: 0;
+    /* room for the copy link button, which sits over the end of the line */
+    padding-right: 32px;
+    overflow-wrap: break-word;
+}
+
+/* The start of the answer under a closed question, one quiet line (two on phones).
+   Opening folds it away over the same 240ms in which the answer grows below, so the
+   preview hands over to the answer instead of jumping out of the row */
+.faq-preview {
+    display: grid;
+    grid-template-rows: 1fr;
+    color: var(--text-3);
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0;
+    transition:
+        grid-template-rows var(--dur) var(--ease-out),
+        opacity var(--dur) var(--ease-out),
+        color var(--dur-fast) ease;
+}
+
+.faq-preview-clip {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.faq-preview-text {
+    display: block;
+    padding-top: 6px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.faq-toggle[aria-expanded="true"] .faq-preview {
+    grid-template-rows: 0fr;
+    opacity: 0;
+}
+
+/* A plus that turns into a cross while the answer is open */
+.faq-plus {
+    width: 20px;
+    height: 20px;
+    margin-top: calc((1.45em - 20px) / 2);
+    color: var(--text-3);
+    transition: transform var(--dur) var(--ease-out), color var(--dur-fast) ease;
+}
+
+.faq-toggle[aria-expanded="true"] .faq-plus {
+    color: var(--text);
+    transform: rotate(45deg);
+}
+
+/* Centred on the first line of the question, just left of the plus */
+.faq-copy {
+    position: absolute;
+    top: calc(24px + (18px * 1.45 - 34px) / 2);
+    right: 28px;
+    display: inline-grid;
+    place-items: center;
+    color: var(--text-3);
+}
+
+/* After a copy the link icon gives way to a check for a moment (js/faq.js).
+   Transitions, so a second click while it is still swapping just turns it back */
+.faq-copy .i {
+    grid-area: 1 / 1;
+    transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.faq-copy .faq-copy-done,
+.faq-copy.is-copied .faq-copy-link {
+    opacity: 0;
+    transform: scale(.9);
+}
+
+.faq-copy.is-copied {
+    color: var(--text);
+}
+
+.faq-copy.is-copied .faq-copy-done {
+    opacity: 1;
+    transform: none;
+}
+
+/* With a mouse the link button waits until the row is pointed at; touch screens always show it */
+@media (hover: hover) and (pointer: fine) {
+    .faq-toggle:hover .faq-plus {
+        color: var(--text);
+    }
+
+    .faq-toggle:hover .faq-preview {
+        color: var(--text-2);
+    }
+
+    .faq-copy {
+        opacity: 0;
+        transition:
+            opacity var(--dur-fast) ease,
+            background-color var(--dur-fast) ease,
+            color var(--dur-fast) ease,
+            transform var(--dur-press) var(--ease-out);
+    }
+
+    .faq-item:hover .faq-copy,
+    .faq-copy:focus-visible,
+    .faq-copy[aria-describedby],
+    .faq-copy.is-copied {
+        opacity: 1;
+    }
+
+    /* Separate rule: a browser without :has() drops only this one */
+    .faq-item:has(:focus-visible) .faq-copy {
+        opacity: 1;
+    }
+}
+
+/* The answer keeps clear of the plus column */
+.faq-a-body {
+    padding: 0 44px 32px 0;
+    transition: opacity var(--dur) var(--ease-out);
+}
+
+/* Opening: Bootstrap grows the height, the answer fades in over the same 240ms.
+   Closing: js/faq.js marks the row, the answer fades out while the height shrinks */
+.faq-a.collapsing {
+    transition: height var(--dur) var(--ease-out);
+}
+
+@starting-style {
+    .faq-a-body {
+        opacity: 0;
+    }
+}
+
+.faq-item.is-closing .faq-a-body {
+    opacity: 0;
+}
+
+/* Without JavaScript nothing can open an answer: they are all shown, and the plus, the
+   preview line and the copy link, which only work with it, are left out */
+html:not(.js) .faq-a {
+    display: block;
+}
+
+html:not(.js) .faq-plus,
+html:not(.js) .faq-preview,
+html:not(.js) .faq-copy {
+    display: none;
+}
+
+html:not(.js) .faq-toggle {
+    padding-bottom: 12px;
+    cursor: default;
+}
+
+/* Search results appear at once: no fade-in for answers it opens or rows it shows
+   again, no folding preview, and no second entrance for those rows */
+.faq.is-filtering .faq-a-body,
+.faq.is-filtering .faq-preview {
+    transition: none;
+}
+
+.faq.is-searched > .faq-item {
+    animation: none;
+}
+
+/* Nothing matched */
+
+.faq-no-results {
+    padding-top: 24px;
+}
+
+/* The query can make the title wrap; body line height would spread it apart */
+.faq-no-results .empty-state-title {
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.faq-no-results-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    margin-top: 20px;
+}
+
+.faq-no-results-actions .btn {
+    margin-top: 0;
+}
+
+/* Too narrow for both in a row: one under the other, the text of the borderless
+   button lined up with the left edge (its hover fill bleeds out instead) */
+@media (max-width: 480px) {
+    .faq-no-results-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .faq-no-results-actions .btn-ghost {
+        margin-left: -18px;
+    }
+}
+
+/* Side column: sticks under the header on wide screens. When a long list of questions
+   is taller than the window, the index scrolls on its own and the help stays in view */
+
+@media (min-width: 1001px) {
+    .faq-side {
+        position: sticky;
+        top: var(--header-h);
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - var(--header-h));
+    }
+
+    .faq-index-block {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .faq-side > .side-block:last-child {
+        flex: none;
+    }
+
+    /* Padding inside the scroll box keeps the focus ring of the links from being clipped */
+    .faq-index {
+        min-height: 0;
+        margin: -6px;
+        padding: 6px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+    }
+
+    .faq-index.has-more {
+        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+        mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent);
+    }
+}
+
+.faq-index a {
+    overflow-wrap: break-word;
+}
+
+/* No matches hide the index; the help below it becomes the first block */
+.faq-index-block[hidden] + .side-block {
+    border-top: 0;
+}
+
+/* Staff on the server now, under the ways to ask: a hairline, a label with the
+   count, then the people as an avatar stack with their names */
+.faq-staff {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.faq-staff-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 12px;
+    color: var(--text-3);
+    font-size: 13.5px;
+}
+
+.faq-staff-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-2);
+}
+
+/* Same dot as the member states in the home page's team list: it carries real state */
+.faq-staff.is-online .faq-staff-count::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--live);
+}
+
+.faq-staff-people {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    margin: 0;
+}
+
+/* The away ones, under the others, with the state the home page's team list gives them */
+.faq-staff-people + .faq-staff-people {
+    margin-top: 10px;
+}
+
+.faq-staff-people .member-state {
+    margin-left: auto;
+}
+
+/* Up to two lines of names next to the stack; a long staff list ends in an ellipsis */
+.faq-staff-names {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-2);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+@media (max-width: 1000px) {
+    /* The side column follows right under the list */
+    .faq-main {
+        padding-bottom: 40px;
+    }
+
+    /* Under the list the index would only repeat the questions right above it */
+    .faq-index-block {
+        display: none;
+    }
+
+    .faq-index-block + .side-block {
+        border-top: 0;
+    }
+
+    /* Keeps the count near its label when the column is as wide as the page */
+    .faq-staff {
+        max-width: 560px;
+    }
+}
+
+@media (max-width: 640px) {
+    .faq-main {
+        padding-top: 12px;
+    }
+
+    .faq-q {
+        font-size: 17px;
+    }
+
+    .faq-toggle {
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+
+    .faq-copy {
+        top: calc(20px + (17px * 1.45 - 34px) / 2);
+    }
+
+    .faq-a-body {
+        padding-right: 0;
+        padding-bottom: 28px;
+    }
+
+    /* A phone line holds little of the answer; two lines say enough to be useful */
+    .faq-preview-text {
+        display: -webkit-box;
+        white-space: normal;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    /* The rows settle one after another, a little quicker than whole blocks do */
+    .faq-item.reveal {
+        animation-delay: calc(60ms + var(--i, 0) * 40ms);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* No height animation and no turning plus; the answer still fades in and the
+       link wash still fades out, neither of them moves anything */
+    .faq-a.collapsing {
+        transition: none;
+    }
+
+    .faq-plus {
+        transition-property: color;
+    }
+
+    /* The preview line goes at once, the height of the row does not animate either;
+       coming back it only fades in */
+    .faq-preview {
+        transition-property: opacity, color;
+    }
+
+    /* The icons of the copy button crossfade without shrinking */
+    .faq-copy .i {
+        transition-property: opacity;
+    }
+}
+
+/* ==========================================================================
+   Rules and imprint placeholders (rules.php, imprint.php), shown inside .prose
+   until the site owner writes the real text
+   ========================================================================== */
+
+.prose .page-placeholder p {
+    margin: 0;
+}
+
+.prose .page-placeholder .empty-state-title {
+    margin-bottom: 6px;
+}

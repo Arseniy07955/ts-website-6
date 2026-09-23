@@ -11,91 +11,167 @@ if(!empty($_POST["allow-metrics-checkbox"])) {
     // set a 7 day cookie that tells us later to send the metrics
     setcookie("tsw_allow_metrics", "true", time() + (86400 * 7));
 }
+
+// Run the checks first, the summary above them depends on the result
+$checksRun = 0;
+$checksPassed = 0;
+
+ob_start();
+checkRequirements();
+$checkResults = ob_get_clean();
 ?>
 
-<div class="card">
-    <div class="card-body">
-        <h4 class="card-title text-center">Requirements check</h4>
+<header class="installer-head reveal">
+    <?= $stepChip ?>
+    <h1 class="page-title">Requirements check</h1>
+    <p class="page-sub">PHP version, extensions and file permissions this server needs for TS-website.</p>
+</header>
 
-        <div class="alert alert-dark text-center mb-3" id="filePermError" style="display: none">
-            Looks like you have failed file permission checks. Try running:<br>
-            <code>sudo chown -R www-data:www-data "<?= realpath(__BASE_DIR) ?>"</code>
-        </div>
+<?php
+$osIcons = ["Linux" => "linux-logo", "Windows" => "windows-logo", "Darwin" => "apple-logo"];
+$checksFailed = $checksRun - $checksPassed;
 
-        <div class="text-center mb-2">
-            <button class="btn btn-secondary" type="button" data-toggle="collapse" data-target="#requirementsTableCollapse">
-                Show details
-            </button>
-        </div>
-
-        <div class="collapse" id="requirementsTableCollapse">
-            <div class="text-center">
-                <table class="table table-responsive requirements-check-table">
-                    <tbody>
-                    <?php checkRequirements(); ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <?php if(defined("CANNOT_INSTALL")) { ?>
-            <div class="col-md-10 offset-md-1">
-                <div class="alert alert-danger">
-                    <strong>Oh snap!</strong> Looks like your current web server configuration does not allow to run TS-website 2.0.
-                    Please fix the above problems and try again.<br>If you have any problems, please check
-                    <a href="https://github.com/Wruczek/ts-website/wiki" target="_blank">wiki</a> and follow the installation guide.
-                </div>
-            </div>
-            <script>
-                // Show requirements table on error
-                $("#requirementsTableCollapse").collapse("show")
-
-                <?php if(defined("FILE_PERM_ERROR")) { ?>
-                    // Show file permission fix tip
-                    $("#filePermError").show()
-                <?php } ?>
-            </script>
-        <?php } else { ?>
-
-            <div class="text-center">
-                <div class="alert alert-success" style="display: inline-block">
-                    <strong>Success!</strong> Looks like you can run TS-website 2.0!
-                </div>
-            </div>
+// "Apache/2.4.58 (Ubuntu)" reads as the name and version, with the build details on the line under it
+$webServer = preg_split('/\s+/', trim((string) ($_SERVER["SERVER_SOFTWARE"] ?? "")), 2);
+$webServerName = $webServer[0] !== "" ? $webServer[0] : "Unknown";
+$webServerDetails = isset($webServer[1]) ? preg_replace('/^\((.*)\)$/', '$1', $webServer[1]) : "";
+?>
+<dl class="cells installer-facts reveal" style="--i: 1">
+    <div class="cell">
+        <dt><?= installerIcon("code", "i-sm") ?>PHP</dt>
+        <dd><span class="cell-text"><?= htmlspecialchars(PHP_VERSION) ?></span></dd>
+    </div>
+    <div class="cell">
+        <dt><?= installerIcon("globe-simple", "i-sm") ?>Web server</dt>
+        <dd><span class="cell-text"><?= htmlspecialchars($webServerName) ?></span></dd>
+        <?php if ($webServerDetails !== "") { ?>
+            <dd class="cell-sub"><?= htmlspecialchars($webServerDetails) ?></dd>
         <?php } ?>
     </div>
-    <div class="card-footer text-right">
-        <a href="?step=<?= $stepNumber - 1 ?>" class="btn btn-primary float-left">
-            <i class="fas fa-chevron-left"></i> Back
+    <div class="cell">
+        <dt><?= installerIcon($osIcons[PHP_OS_FAMILY] ?? "desktop", "i-sm") ?>Operating system</dt>
+        <dd><span class="cell-text"><?= htmlspecialchars(PHP_OS_FAMILY) ?></span></dd>
+    </div>
+    <div class="cell">
+        <dt><?= installerIcon("list-checks", "i-sm") ?>Checks passed</dt>
+        <dd>
+            <span class="state-dot <?= $checksFailed ? "is-fail" : "is-ok" ?>" aria-hidden="true"></span>
+            <?= $checksPassed ?><span class="of"> / <?= $checksRun ?></span>
+        </dd>
+        <?php if ($checksFailed) { ?>
+            <dd class="cell-sub"><?= $checksFailed === 1 ? "1 problem to fix" : "$checksFailed problems to fix" ?></dd>
+        <?php } ?>
+    </div>
+</dl>
+
+<div class="installer-body">
+    <?php if(defined("CANNOT_INSTALL")) { ?>
+        <div class="alert alert-danger has-icon check-summary reveal" style="--i: 2" role="alert">
+            <?= installerIcon("x-circle", "alert-icon") ?>
+            This server cannot run TS-website yet. Fix the problems below and check again.
+            If you are stuck, follow the installation guide in the
+            <a href="https://github.com/Wruczek/ts-website/wiki" target="_blank" rel="noopener">wiki</a>.
+
+            <?php if(defined("FILE_PERM_ERROR")) { ?>
+                <p class="mt-2 mb-0">To fix the file permissions, try running:</p>
+                <pre><code>sudo chown -R www-data:www-data "<?= htmlspecialchars(realpath(__BASE_DIR)) ?>"</code></pre>
+            <?php } ?>
+        </div>
+    <?php } else { ?>
+        <div class="alert alert-success has-icon check-summary reveal" style="--i: 2" role="status">
+            <?= installerIcon("check-circle", "alert-icon") ?>
+            Everything is in place, this server can run TS-website.
+        </div>
+
+        <button class="btn btn-secondary btn-sm details-toggle reveal" style="--i: 3" type="button"
+                data-toggle="collapse" data-target="#requirementsDetails" aria-expanded="false" aria-controls="requirementsDetails">
+            <span class="details-toggle-label">Show details</span><?= installerIcon("caret-down", "caret") ?>
+        </button>
+    <?php } ?>
+
+    <?php // Failed checks are shown right away, a clean result keeps them folded ?>
+    <div class="check-details collapse<?= defined("CANNOT_INSTALL") ? " show" : "" ?>" id="requirementsDetails">
+        <div class="check-details-inner">
+            <?= $checkResults ?>
+        </div>
+    </div>
+
+    <div class="installer-actions reveal" style="--i: 4">
+        <a href="?step=<?= $stepNumber - 1 ?>" class="btn btn-ghost">
+            <?= installerIcon("arrow-left") ?>Back
         </a>
 
         <?php if(defined("CANNOT_INSTALL")) { ?>
-            <a href="#" onclick="location = location; this.className += ' disabled'; return false" class="btn btn-warning float-right">
-                Re-check <i class="fas fa-sync"></i>
+            <a href="?step=<?= $stepNumber ?>" class="btn btn-primary" data-busy>
+                Check again<?= installerIcon("arrow-clockwise", "i-retry") ?><?= installerIcon("circle-notch", "i-busy") ?>
             </a>
         <?php } else { ?>
-            <a href="?step=<?= $stepNumber + 1 ?>" class="btn btn-primary float-right">
-                Next <i class="fas fa-chevron-right"></i>
+            <a href="?step=<?= $stepNumber + 1 ?>" class="btn btn-primary">
+                Next<?= installerIcon("arrow-right", "i-arrow") ?>
             </a>
         <?php } ?>
     </div>
 </div>
 
+<?php ob_start(); ?>
+<section class="side-block reveal" style="--i: 1" aria-labelledby="fix-title">
+    <div class="side-head">
+        <h2 class="side-title" id="fix-title">If a check fails</h2>
+    </div>
+
+    <ul class="howto">
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("lock-simple") ?></span>
+            <div>
+                <p class="howto-title">File permissions</p>
+                <p class="howto-sub">The user the web server runs as needs to write to <code>private</code> and <code>private/cache</code></p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("plugs-connected") ?></span>
+            <div>
+                <p class="howto-title">PHP extensions</p>
+                <p class="howto-sub">Install the missing one for this PHP version, then restart the web server or PHP-FPM</p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("book-open-text") ?></span>
+            <div>
+                <p class="howto-title">Installation guide</p>
+                <a class="howto-link" href="https://github.com/Wruczek/ts-website/wiki" target="_blank" rel="noopener">Wiki on GitHub<?= installerIcon("arrow-up-right", "i-sm") ?></a>
+            </div>
+        </li>
+    </ul>
+</section>
+<?php $pageNotes = ob_get_clean(); ?>
+
+<script>
+    $("#requirementsDetails").on("show.bs.collapse hide.bs.collapse", function (e) {
+        $(".details-toggle .details-toggle-label").text(e.type === "show" ? "Hide details" : "Show details")
+    })
+
+    // "Check again" reloads the page, show that it is working
+    $("[data-busy]").click(function () {
+        $(this).addClass("is-busy").attr("aria-disabled", "true")
+    })
+</script>
+
 <?php
 function checkRequirements() {
-    // PHP version - 7.2.0 min, but older than 8.0
-    // ts3phpframework needs to release a version with https://git.io/JKlRx for PHP 8 support
+    displayCategory("PHP");
+
+    // PHP version: 7.2 or newer
     {
-        $result = (PHP_VERSION_ID < 70200 || PHP_VERSION_ID > 80000) ? 2 : 0;
+        $result = PHP_VERSION_ID < 70200 ? 2 : 0;
 
         showCheckResult(
-                "PHP 7.2.0 - 7.4",
+                "PHP 7.2 or newer",
                 $result,
                 "Current PHP version: " . PHP_VERSION
         );
     }
 
-    displayCategory("Extension checks");
+    displayCategory("Extensions");
 
     // Extensions check
     {
@@ -103,16 +179,16 @@ function checkRequirements() {
             $result = extension_loaded($extension);
 
             showCheckResult(
-                "<code>$extension</code> extension",
+                "<code>$extension</code>",
                 $result ? 0 : 2,
                 $result ?
-                    "Extension installed and loaded" :
-                    'Please install or enable <code>' . $extension . '</code> extension'
+                    "Installed and loaded" :
+                    'Please install or enable the <code>' . $extension . '</code> extension'
             );
         }
     }
 
-    displayCategory("File / directory permission checks");
+    displayCategory("File and directory permissions");
 
     // file / directory writable checks
     {
@@ -139,13 +215,13 @@ function checkRequirements() {
             // because it does not work with non-existing files
             $realpath = resolveFilename($path);
 
-            $msg = "Yes";
+            $msg = "Writable";
 
             if(!$writable)
                 $msg = "Please make <code>$realpath</code> writable";
 
             if(!$exists)
-                $msg = ($isFile ? "File" : "Directory") . " <code>$realpath</code> does not exists, please create it";
+                $msg = ($isFile ? "File" : "Directory") . " <code>$realpath</code> does not exist, please create it";
 
             $success = $exists && $writable;
 
@@ -153,7 +229,7 @@ function checkRequirements() {
                 define("FILE_PERM_ERROR", true);
             }
 
-            showCheckResult("Is <code>$basename</code> writable?", $success ? 0 : 2, $msg);
+            showCheckResult("<code>$basename</code>", $success ? 0 : 2, $msg);
         }
     }
 
@@ -212,17 +288,28 @@ function checkRequirements() {
         }
     }
 
+    // close the last category
+    echo '</ul></section>';
 }
 
 // Utils
 
 function showCheckResult($name, $state, $resulttext) {
+    $GLOBALS["checksRun"]++;
+
     if($state === 0) {
-        $attr = "fa-check-circle color-success";
+        $GLOBALS["checksPassed"]++;
+        $class = "check-ok";
+        $icon = installerIcon("check-circle");
+        $label = "Passed";
     } else if($state === 1) {
-        $attr = "fa-minus-circle color-warning";
+        $class = "check-warn";
+        $icon = installerIcon("warning-circle");
+        $label = "Warning";
     } else {
-        $attr = "fa-times-circle color-danger";
+        $class = "check-fail";
+        $icon = installerIcon("x-circle");
+        $label = "Failed";
 
         if(!defined("CANNOT_INSTALL")) {
             define("CANNOT_INSTALL", true);
@@ -230,15 +317,21 @@ function showCheckResult($name, $state, $resulttext) {
     }
 
     ?>
-    <tr>
-        <td class="text-right"><?= $name ?></td>
-        <td><i class="fas <?= $attr ?> fa-lg"></i></td>
-        <td><?= $resulttext ?></td>
-    </tr>
+    <li class="row-item">
+        <p class="row-label"><?= $name ?></p>
+        <p class="row-value check-state <?= $class ?>"><?= $icon ?><span><span class="sr-only"><?= $label ?>: </span><?= $resulttext ?></span></p>
+    </li>
 <?php }
 
 function displayCategory($name) {
-    echo '<tr><td colspan="3" class="text-center lead">' . $name . '</td></tr>';
+    static $open = false;
+
+    if ($open) {
+        echo '</ul></section>';
+    }
+
+    $open = true;
+    echo '<section class="check-group"><h2 class="check-group-title">' . $name . '</h2><ul class="rows">';
 }
 
 // https://tomnomnom.com/posts/realish-paths-without-realpath

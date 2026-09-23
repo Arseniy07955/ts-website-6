@@ -125,7 +125,7 @@ class AdminStatus {
         if ($format === self::STATUS_STYLE_LIST_ONLINE_FIRST) {
             if ($hideOffline) {
                 // we dont care about the offline users if hideOffline is true
-                $data = @$data["online"];
+                $data = $data["online"] ?? [];
             } else {
                 // ...combine online and offline arrays
                 // see line #89 for explanation
@@ -133,7 +133,7 @@ class AdminStatus {
                 // NOTE: we are using array_merge instead of the "+"
                 // operator, because we have default numeric keys.
                 // Using "+" would make us loose some data
-                $data = array_merge(@$data["online"], @$data["offline"]);
+                $data = array_merge($data["online"] ?? [], $data["offline"] ?? []);
             }
         }
 

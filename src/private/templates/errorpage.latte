@@ -1,131 +1,1668 @@
+{*
+ * Error page: 404.php, plus fatal database, config and CSRF errors (TemplateUtils::renderErrorTemplate).
+ * It can render while the database is down, before the language functions exist and from any
+ * directory (api/*.php, a web server ErrorDocument), so it carries its own styles and icons,
+ * resolves the website root from the running script and keeps its own copy of the strings in
+ * English and Russian (the same text as bundled/en/errorpage.php and bundled/ru/errorpage.php).
+ *}
+{php
+    $fallbacks = [
+        "en" => [
+            "ERRORPAGE_TRY_AGAIN" => "Try again",
+            "ERRORPAGE_GO_BACK" => "Go back",
+            "ERRORPAGE_HOME" => "Home page",
+            "ERRORPAGE_ERROR" => "Something went wrong",
+            "ERRORPAGE_NOT_FOUND" => "Page not found",
+            "ERRORPAGE_NOT_FOUND_HINT" => "The address may be mistyped, or the page has moved.",
+            "ERRORPAGE_DB_CODE" => "DB error",
+            "ERRORPAGE_DB_CONNECTION" => "Cannot connect to the database",
+            "ERRORPAGE_DB_CONFIG" => "Cannot load the settings from the database",
+            "ERRORPAGE_DB_HINT" => "The website is having trouble with its database. Try again in a minute.",
+            "ERRORPAGE_CSRF" => "Security check failed",
+            "ERRORPAGE_CSRF_HINT" => "The page was probably open for too long. Go back, reload it and try again.",
+            "ERRORPAGE_REQUESTED" => "Requested address",
+            "ERRORPAGE_DETAILS" => "Details",
+            "ERRORPAGE_REASON" => "Reason",
+            "ERRORPAGE_SERVER_TIME" => "Server time",
+            "ERRORPAGE_TS_TITLE" => "TeamSpeak server",
+            "ERRORPAGE_TS_CONNECT" => "Connect to the server",
+            "ERRORPAGE_TS_DOWNLOAD" => "Download TeamSpeak",
+            "ERRORPAGE_TS_APART" => "TeamSpeak does not depend on the website",
+            "ERRORPAGE_TS_APART_HINT" => "If the server is up, connect from your bookmarks as usual.",
+            "ERRORPAGE_TS_ONLINE" => "Online now",
+            "ERRORPAGE_TS_FREE" => "Free slots",
+            "ERRORPAGE_TS_CHANNELS" => "Channels",
+            "ERRORPAGE_TS_OFFLINE" => "The server is not answering right now",
+            "ERRORPAGE_STATUS" => "Status",
+            "ERRORPAGE_STATUS_WEB" => "Web server",
+            "ERRORPAGE_STATUS_WEB_OK" => "Responding",
+            "ERRORPAGE_STATUS_DB" => "Database",
+            "ERRORPAGE_STATUS_DB_DOWN" => "No connection",
+            "ERRORPAGE_STATUS_DB_FAIL" => "Read error",
+            "ERRORPAGE_NAV_MAIN" => "Main navigation",
+            "ERRORPAGE_NAV_GROUPS" => "Groups",
+            "ERRORPAGE_NAV_BANS" => "Bans",
+            "ERRORPAGE_CONNECT" => "Connect",
+            "ERRORPAGE_SECTIONS" => "Website sections",
+            "ERRORPAGE_DEST_HOME" => "Home",
+            "ERRORPAGE_DEST_HOME_HINT" => "Who is online and the news",
+            "ERRORPAGE_DEST_CHANNELS" => "Channels",
+            "ERRORPAGE_DEST_CHANNELS_HINT" => "The channel tree, who is where",
+            "ERRORPAGE_DEST_RULES" => "Rules",
+            "ERRORPAGE_DEST_RULES_HINT" => "The server rules",
+            "ERRORPAGE_DEST_FAQ" => "FAQ",
+            "ERRORPAGE_DEST_FAQ_HINT" => "Answers to common questions",
+        ],
+        "ru" => [
+            "ERRORPAGE_TRY_AGAIN" => "Попробовать снова",
+            "ERRORPAGE_GO_BACK" => "Назад",
+            "ERRORPAGE_HOME" => "На главную",
+            "ERRORPAGE_ERROR" => "Что-то пошло не так",
+            "ERRORPAGE_NOT_FOUND" => "Страница не найдена",
+            "ERRORPAGE_NOT_FOUND_HINT" => "Возможно, в адресе опечатка или страница переехала.",
+            "ERRORPAGE_DB_CODE" => "Ошибка БД",
+            "ERRORPAGE_DB_CONNECTION" => "Нет связи с базой данных",
+            "ERRORPAGE_DB_CONFIG" => "Не удалось загрузить настройки из базы данных",
+            "ERRORPAGE_DB_HINT" => "У сайта проблемы с базой данных. Попробуйте ещё раз через минуту.",
+            "ERRORPAGE_CSRF" => "Проверка безопасности не пройдена",
+            "ERRORPAGE_CSRF_HINT" => "Скорее всего, страница была открыта слишком долго. Вернитесь назад, обновите её и попробуйте снова.",
+            "ERRORPAGE_REQUESTED" => "Запрошенный адрес",
+            "ERRORPAGE_DETAILS" => "Подробности",
+            "ERRORPAGE_REASON" => "Причина",
+            "ERRORPAGE_SERVER_TIME" => "Время на сервере",
+            "ERRORPAGE_TS_TITLE" => "Сервер TeamSpeak",
+            "ERRORPAGE_TS_CONNECT" => "Подключиться к серверу",
+            "ERRORPAGE_TS_DOWNLOAD" => "Скачать TeamSpeak",
+            "ERRORPAGE_TS_APART" => "TeamSpeak не зависит от сайта",
+            "ERRORPAGE_TS_APART_HINT" => "Если сервер работает, подключайтесь из закладок, как обычно.",
+            "ERRORPAGE_TS_ONLINE" => "Сейчас в сети",
+            "ERRORPAGE_TS_FREE" => "Свободно мест",
+            "ERRORPAGE_TS_CHANNELS" => "Каналы",
+            "ERRORPAGE_TS_OFFLINE" => "Сервер сейчас не отвечает",
+            "ERRORPAGE_STATUS" => "Состояние",
+            "ERRORPAGE_STATUS_WEB" => "Веб-сервер",
+            "ERRORPAGE_STATUS_WEB_OK" => "Отвечает",
+            "ERRORPAGE_STATUS_DB" => "База данных",
+            "ERRORPAGE_STATUS_DB_DOWN" => "Нет связи",
+            "ERRORPAGE_STATUS_DB_FAIL" => "Ошибка чтения",
+            "ERRORPAGE_NAV_MAIN" => "Основная навигация",
+            "ERRORPAGE_NAV_GROUPS" => "Группы",
+            "ERRORPAGE_NAV_BANS" => "Баны",
+            "ERRORPAGE_CONNECT" => "Подключиться",
+            "ERRORPAGE_SECTIONS" => "Разделы сайта",
+            "ERRORPAGE_DEST_HOME" => "Главная",
+            "ERRORPAGE_DEST_HOME_HINT" => "Кто сейчас в сети и новости",
+            "ERRORPAGE_DEST_CHANNELS" => "Каналы",
+            "ERRORPAGE_DEST_CHANNELS_HINT" => "Дерево каналов: кто где сидит",
+            "ERRORPAGE_DEST_RULES" => "Правила",
+            "ERRORPAGE_DEST_RULES_HINT" => "Правила сервера",
+            "ERRORPAGE_DEST_FAQ" => "FAQ",
+            "ERRORPAGE_DEST_FAQ_HINT" => "Ответы на частые вопросы",
+        ],
+    ];
+    $t = $fallbacks["en"];
+    $langCode = "en";
+    $canTranslate = defined("USER_LANGUAGE_ID") && function_exists("__get");
+}
+
+{* Translate only once the website knows the visitor's language. load.php declares __get() at compile
+   time, but it needs the languages from the database, so with the database down it would recurse *}
+
+{if $canTranslate}
+    {foreach $t as $key => $fallback}
+        {php $t[$key] = __get($key, [], true) ?? $fallback}
+    {/foreach}
+
+    {var $userLang = Wruczek\TSWebsite\Utils\Language\LanguageUtils::i()->getLanguageById(USER_LANGUAGE_ID)}
+    {var $langCode = $userLang ? $userLang->getLanguageCode() : "en"}
+{else}
+    {* Before that (a CSRF error runs ahead of the language detection, a database error stops it) pick
+       the language the way LanguageUtils::detectUserLanguage() does: the cookie, then Accept-Language *}
+    {php $wanted = isset($_COOKIE["tswebsite_language"]) ? [(string) $_COOKIE["tswebsite_language"]] : []}
+    {foreach explode(",", (string) ($_SERVER["HTTP_ACCEPT_LANGUAGE"] ?? "")) as $item}
+        {php $wanted[] = trim(explode(";", $item)[0])}
+    {/foreach}
+
+    {foreach $wanted as $code}
+        {php $base = explode("-", strtolower($code))[0]}
+        {if isset($fallbacks[$base])}
+            {php $t = $fallbacks[$base]; $langCode = $base}
+            {breakIf true}
+        {/if}
+    {/foreach}
+{/if}
+
+{* Absolute URL path of the website root, e.g. "/" or "/ts/", from the running script's depth
+   below it. Falls back to relative URLs when the script lives somewhere else *}
+{php
+    $root = "";
+    $baseDir = realpath(__BASE_DIR);
+    $scriptDir = realpath(dirname($_SERVER["SCRIPT_FILENAME"] ?? ""));
+    $scriptSubdir = $baseDir && $scriptDir ? trim(substr($scriptDir, strlen($baseDir)), "/\\") : null;
+    $urlDir = trim(str_replace("\\", "/", dirname($_SERVER["SCRIPT_NAME"] ?? "/")), "/");
+    $urlParts = $urlDir === "" ? [] : explode("/", $urlDir);
+    $depth = $scriptSubdir === null || $scriptSubdir === "" ? 0 : count(preg_split('~[/\\\\]~', $scriptSubdir));
+}
+
+{if $scriptSubdir !== null && strpos($scriptDir . DIRECTORY_SEPARATOR, $baseDir . DIRECTORY_SEPARATOR) === 0 && count($urlParts) >= $depth}
+    {var $rootParts = array_map("rawurlencode", array_slice($urlParts, 0, count($urlParts) - $depth))}
+    {var $root = "/" . ($rootParts ? implode("/", $rootParts) . "/" : "")}
+{/if}
+
+{* The callers pass fixed English names, show them in the visitor's language. One clear way
+   forward: home for a missing page, back for a stale form, otherwise try again. With the database
+   down every other page fails too, so the page offers no sections then and shows what is still
+   working instead. The dot next to the requested address: a missing page is not a fault, a stale
+   form is a warning. A server-side failure gets the server time, so a visitor can tell the admin
+   when it happened. The side column holds the voice server; without it (a CSRF error runs before
+   the settings are read) the details alone would leave a near-empty column, so they follow the
+   actions instead *}
+{php
+    $nameKeys = [
+        "Page not found" => "ERRORPAGE_NOT_FOUND",
+        "Connection to database failed" => "ERRORPAGE_DB_CONNECTION",
+        "Cannot get config data from database" => "ERRORPAGE_DB_CONFIG",
+        "Security error. Please go to the previous page and try again." => "ERRORPAGE_CSRF",
+        "Error" => "ERRORPAGE_ERROR",
+    ];
+    $hintKeys = [
+        "ERRORPAGE_NOT_FOUND" => "ERRORPAGE_NOT_FOUND_HINT",
+        "ERRORPAGE_DB_CONNECTION" => "ERRORPAGE_DB_HINT",
+        "ERRORPAGE_DB_CONFIG" => "ERRORPAGE_DB_HINT",
+        "ERRORPAGE_CSRF" => "ERRORPAGE_CSRF_HINT",
+    ];
+
+    $nameKey = $nameKeys[(string) $errorname] ?? null;
+    $name = $nameKey ? $t[$nameKey] : (string) $errorname;
+    $hint = $nameKey && isset($hintKeys[$nameKey]) ? $t[$hintKeys[$nameKey]] : null;
+    $code = $errorcode === "DB error" ? $t["ERRORPAGE_DB_CODE"] : trim((string) $errorcode);
+    $codeChars = $code === "" ? [] : preg_split("//u", $code, -1, PREG_SPLIT_NO_EMPTY);
+    $primary = $errorcode === "404" ? "home" : ($nameKey === "ERRORPAGE_CSRF" ? "back" : "retry");
+
+    $isDbError = $errorcode === "DB error";
+    $dbState = $nameKey === "ERRORPAGE_DB_CONFIG" ? $t["ERRORPAGE_STATUS_DB_FAIL"] : $t["ERRORPAGE_STATUS_DB_DOWN"];
+    $severity = $errorcode === "404" ? "quiet" : ($nameKey === "ERRORPAGE_CSRF" ? "warn" : "danger");
+
+    $requested = (string) ($_SERVER["REQUEST_URI"] ?? "");
+    $decoded = rawurldecode($requested);
+    $requested = preg_match("//u", $decoded) ? $decoded : $requested;
+
+    $hasDescription = $description !== null && $description !== "";
+    $now = time();
+
+    $siteTitle = $config["website_title"] ?? "";
+    $brand = $config["nav_brand"] ?? "";
+    $tsAddress = trim((string) ($config["query_displayip"] ?? ""));
+    $themeDefault = in_array($config["theme_default"] ?? "dark", ["dark", "light", "auto"], true) ? ($config["theme_default"] ?? "dark") : "dark";
+
+    $showTs = $tsAddress !== "" || $isDbError;
+    $hasSide = $showTs;
+    $detailsInMain = $hasDescription && !$showTs;
+
+    $navLinks = [];
+    $connectLabel = ($canTranslate ? __get("CONNECT_BUTTON", [], true) : null) ?? $t["ERRORPAGE_CONNECT"];
+    $navLabel = ($canTranslate ? __get("NAV_MAIN", [], true) : null) ?? $t["ERRORPAGE_NAV_MAIN"];
+}
+
+{* The website's own navigation, in the site's words when they can be read *}
+{foreach [
+    ["viewer.php", "NAV_VIEWER", "ERRORPAGE_DEST_CHANNELS"],
+    ["assigner.php", "NAV_ASSIGNER", "ERRORPAGE_NAV_GROUPS"],
+    ["bans.php", "NAV_BANS", "ERRORPAGE_NAV_BANS"],
+    ["rules.php", "NAV_RULES", "ERRORPAGE_DEST_RULES"],
+    ["faq.php", "NAV_FAQ", "ERRORPAGE_DEST_FAQ"],
+] as $nav}
+    {php $navLinks[] = [$nav[0], ($canTranslate ? __get($nav[1], [], true) : null) ?? $t[$nav[2]]]}
+{/foreach}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{$langCode}" data-theme="dark" data-theme-default="{$themeDefault}">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="generator" content="TS-website {\__TSWEBSITE_VERSION} by Wruczek / https://github.com/Wruczek/ts-website">
+    <meta name="robots" content="noindex">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#0f0f10">
+    <link rel="icon" type="image/png" sizes="32x32" href="{$root}img/icons/defaulticon-32.png">
 
-    <title>{$errorname}</title>
+    <title>{$name}{if $siteTitle !== ""} | {$siteTitle}{/if}</title>
 
-    <!-- FontAwesome CSS 5.2.0 -->
-    <!-- Used for the warning triangle in the background. Probably overkill, svg would be enough... -->
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.2.0/css/all.css"
-          integrity="sha256-iJGhYPiir7gd5SWfn2jlrzeCNI6iknrZ6Wm8iMfTmYQ=" crossorigin="anonymous">
+    <script>
+        // Same theme resolution as body.latte, before the first paint
+        (function (root) {
+            root.classList.add("js")
+
+            // A page transition can be skipped (fast clicks, reloads); that is not an error
+            function quiet(transition) {
+                transition.ready.catch(function () {})
+                transition.finished.catch(function () {})
+                transition.updateCallbackDone.catch(function () {})
+            }
+
+            window.addEventListener("pageswap", function (e) {
+                e.viewTransition && quiet(e.viewTransition)
+            })
+
+            // Pages entered through a view transition skip their own entrance animation
+            window.addEventListener("pagereveal", function (e) {
+                if (e.viewTransition) {
+                    root.classList.add("page-transition")
+                    quiet(e.viewTransition)
+                }
+            })
+
+            var mode = root.getAttribute("data-theme-default")
+            try { mode = localStorage.getItem("tswebsite_theme") || mode } catch (e) {}
+            if (mode === "auto") {
+                mode = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"
+            }
+            root.setAttribute("data-theme", mode === "light" ? "light" : "dark")
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", mode === "light" ? "#ffffff" : "#0f0f10")
+        })(document.documentElement)
+    </script>
 
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
+        /*
+         * Mirrors css/tsw.css, which this page cannot rely on: the fonts, the color and motion tokens,
+         * --header-h, --frame and --pad-x with their breakpoints, and the frame, header, top navigation,
+         * buttons, .live-state, .digit, .side-block, .side-stats, .howto, .cells and footer rules.
+         * Keep them in step when those change. When fonts/ cannot be reached, the system stack takes over.
+         */
+        @font-face {
+            font-family: "Onest";
+            font-weight: 300 700;
+            font-display: swap;
+            src: url("{$root}fonts/onest-cyrillic.woff2") format("woff2");
+            unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+        }
+
+        @font-face {
+            font-family: "Onest";
+            font-weight: 300 700;
+            font-display: swap;
+            src: url("{$root}fonts/onest-latin.woff2") format("woff2");
+            unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+        }
+
+        @font-face {
+            font-family: "Geist Mono";
+            font-weight: 400 600;
+            font-display: swap;
+            src: url("{$root}fonts/geist-mono-cyrillic.woff2") format("woff2");
+            unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+        }
+
+        @font-face {
+            font-family: "Geist Mono";
+            font-weight: 400 600;
+            font-display: swap;
+            src: url("{$root}fonts/geist-mono-latin.woff2") format("woff2");
+            unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+        }
+
+        :root {
+            --font-sans: "Onest", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            --radius: 8px;
+            --ease-out: cubic-bezier(.23, 1, .32, 1);
+            --ease-in-out: cubic-bezier(.77, 0, .175, 1);
+            --dur-press: 140ms;
+            --dur-fast: 180ms;
+            --dur: 240ms;
+            --dur-enter: 420ms;
+            --header-h: 68px;
+            --frame: 1240px;
+            --pad-x: 48px;
+
+            color-scheme: dark;
+            --bg: #0f0f10;
+            --bg-2: #171718;
+            --bg-3: #212123;
+            --line: rgba(255, 255, 255, .085);
+            --line-2: rgba(255, 255, 255, .15);
+            --text: #ededee;
+            --text-2: #a1a1a7;
+            --text-3: #7e7e85;
+            --ink: #ededee;
+            --ink-hover: #ffffffe6;
+            --ink-fg: #0f0f10;
+            --live: #86d19f;
+            --away: #dcb66e;
+            --danger: #f08c8c;
+            --selection: rgba(237, 237, 238, .2);
+        }
+
+        :root[data-theme="light"] {
+            color-scheme: light;
+            --bg: #ffffff;
+            --bg-2: #f4f4f5;
+            --bg-3: #e9e9eb;
+            --line: rgba(17, 17, 19, .09);
+            --line-2: rgba(17, 17, 19, .16);
+            --text: #111113;
+            --text-2: #5e5e64;
+            --text-3: #6f6f76;
+            --ink: #111113;
+            --ink-hover: #2d2d31;
+            --ink-fg: #ffffff;
+            --live: #25774a;
+            --away: #875f0e;
+            --danger: #b3261e;
+            --selection: rgba(17, 17, 19, .12);
+        }
+
+        @media (max-width: 900px) {
+            :root {
+                --pad-x: 28px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            :root {
+                --header-h: 60px;
+                --pad-x: 20px;
+            }
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            background-color: var(--bg);
+            -webkit-text-size-adjust: 100%;
         }
 
         body {
-            background: #2c3e50;
-            color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            min-height: 100dvh;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.65;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
 
-            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            line-height: 1.42857143;
-            font-weight: 300;
+        ::selection {
+            background-color: var(--selection);
+            color: var(--text);
+        }
+
+        :focus {
+            outline: none;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--text);
+            outline-offset: 3px;
+            border-radius: 3px;
+        }
+
+        p, h1, h2, dl, dd, ul {
+            margin: 0;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .i {
+            display: inline-block;
+            flex: none;
+            width: 1.05em;
+            height: 1.05em;
+            fill: currentColor;
+        }
+
+        .i-sm {
+            width: .95em;
+            height: .95em;
+        }
+
+        .mono {
+            font-family: var(--font-mono);
+        }
+
+        .tabular {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* The page sits in the website's frame: a column with hairlines on both sides */
+        .frame {
+            display: flex;
+            flex-direction: column;
+            flex: 1 0 auto;
+            width: 100%;
+            max-width: var(--frame);
+            margin: 0 auto;
+            border-inline: 1px solid var(--line);
+        }
+
+        @media (max-width: 1280px) {
+            .frame {
+                border-inline: 0;
+            }
+        }
+
+        /* Header: the brand, the sections and the connect button in the same places as on every
+           other page. It carries the site header's view-transition name, so between the website
+           and this page the header holds still */
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--line);
+            background: var(--bg);
+            background: color-mix(in srgb, var(--bg) 86%, transparent);
+            -webkit-backdrop-filter: blur(14px) saturate(140%);
+            backdrop-filter: blur(14px) saturate(140%);
+            view-transition-name: site-header;
+        }
+
+        .site-header-inner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: var(--header-h);
+            padding-inline: var(--pad-x);
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            margin-right: auto;
+            color: var(--text);
+            font-size: 16px;
+            font-weight: 500;
+            letter-spacing: -.01em;
+            text-decoration: none;
+        }
+
+        .brand img {
+            width: 26px;
+            height: 26px;
+            flex: none;
+            border-radius: 6px;
+        }
+
+        .brand-name {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .topnav ul {
+            display: flex;
+            gap: 26px;
+            margin: 0 20px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        /* Without the connect button (no settings) the links end on the frame's padding */
+        .topnav:last-child ul {
+            margin-right: 0;
+        }
+
+        .topnav-link {
+            display: inline-block;
+            padding: 6px 0;
+            color: var(--text-2);
+            font-size: 15px;
+            line-height: 1.65;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: color var(--dur-fast) ease;
+        }
+
+        .topnav-link:hover {
+            color: var(--text);
+        }
+
+        @media (max-width: 960px) {
+            .topnav {
+                display: none;
+            }
+        }
+
+        /* Buttons: ink for the one main action, the header's small connect button */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex: none;
+            min-height: 40px;
+            padding: 8px 18px;
+            border: 1px solid var(--ink);
+            border-radius: var(--radius);
+            background-color: var(--ink);
+            color: var(--ink-fg);
+            font-family: var(--font-sans);
+            font-size: 15px;
+            font-weight: 500;
+            line-height: 1.2;
+            text-decoration: none;
+            white-space: nowrap;
+            transition:
+                background-color var(--dur-fast) ease,
+                border-color var(--dur-fast) ease,
+                transform var(--dur-press) var(--ease-out);
+        }
+
+        .btn:hover {
+            border-color: var(--ink-hover);
+            background-color: var(--ink-hover);
+            color: var(--ink-fg);
+        }
+
+        .btn:active {
+            transform: scale(.97);
+        }
+
+        .btn-sm {
+            gap: 6px;
+            min-height: 34px;
+            padding: 5px 12px;
+            font-size: 14px;
+        }
+
+        .btn-lg {
+            min-height: 48px;
+            padding: 10px 24px;
             font-size: 16px;
         }
 
-        .flex {
+        /* Hero: like the home page, the big number on the left, the side column on the right. It takes
+           the free height, so the row of cells always sits on the footer */
+
+        .err {
             display: flex;
-            height: 100vh;
+            flex-direction: column;
+            flex: 1 0 auto;
         }
 
-        .container {
-            margin: auto;
-            text-align: center;
-            max-width: 450px;
+        .err-hero {
+            display: grid;
+            flex: 1 0 auto;
+            grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
         }
 
-        .errorcode {
-            font-size: 96px;
+        .err-hero.is-solo {
+            grid-template-columns: minmax(0, 1fr);
         }
 
-        .errorname {
-            font-size: 24px;
-            margin-bottom: 10px;
+        .err-main {
+            min-width: 0;
+            padding: 56px var(--pad-x) 60px;
         }
 
-        .errordescription {
-            font-family: monospace, sans-serif;
+        .err-side {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            border-left: 1px solid var(--line);
         }
 
-        .dark-color {
-            color: #9E9E9E;
+        /* The address that was asked for, in the chip where the home page shows the server state */
+        .live-state {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 100%;
+            margin-bottom: 36px;
+            padding: 6px 12px 6px 10px;
+            border: 1px solid var(--line-2);
+            border-radius: var(--radius);
+            color: var(--text-2);
+            font-size: 14px;
+            line-height: 1.5;
         }
 
-        .actions-container {
-            margin-top: 20px;
+        .live-dot {
+            position: relative;
+            width: 8px;
+            height: 8px;
+            flex: none;
+            border-radius: 50%;
+            background: var(--text-3);
         }
 
-        .actions-container > a {
+        [data-severity="warn"] .live-dot {
+            background: var(--away);
+        }
+
+        [data-severity="danger"] .live-dot,
+        .live-dot.is-down {
+            background: var(--danger);
+        }
+
+        /* Green once the server has answered, grey while the numbers load */
+        .live-dot.is-up,
+        [data-state="online"] .live-dot {
+            background: var(--live);
+        }
+
+        .err-path {
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            font-family: var(--font-mono);
+            font-size: 13.5px;
+        }
+
+        .err-code {
+            display: flex;
+            align-items: flex-end;
+            /* pull the numerals back by their side bearing so they line up with the text below */
+            margin: 0 0 0 -.055em;
+            color: var(--text);
+            font-size: clamp(88px, 8vw + 40px, 152px);
+            font-weight: 300;
+            line-height: 1;
+            letter-spacing: -.055em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Codes that are words ("DB error") get a smaller size so they fit a phone */
+        .err-code.is-word {
+            margin-left: -.04em;
+            font-size: clamp(56px, 6vw + 24px, 112px);
+            letter-spacing: -.045em;
+        }
+
+        /* Every character sits in its own clipped box, like the online counter (js/status.js) */
+        .digit {
+            position: relative;
+            display: inline-block;
+            overflow: hidden;
+            height: 1em;
+            white-space: pre;
+        }
+
+        .is-word .digit {
+            height: 1.2em;
+            line-height: 1.2;
+        }
+
+        .digit > span {
+            display: block;
+        }
+
+        .err-title {
+            margin-top: 28px;
+            max-width: 640px;
+            color: var(--text);
+            font-size: 28px;
+            font-weight: 500;
+            line-height: 1.2;
+            letter-spacing: -.028em;
+            text-wrap: balance;
+        }
+
+        /* Without a code, the name is the page title */
+        .err-title.is-lone {
+            margin-top: 0;
+            font-size: clamp(34px, 2.4vw + 18px, 48px);
+            line-height: 1.05;
+            letter-spacing: -.035em;
+        }
+
+        .err-hint {
+            margin-top: 12px;
+            max-width: 560px;
+            color: var(--text-2);
+            font-size: 18px;
+            line-height: 1.55;
+            text-wrap: pretty;
+        }
+
+        .err-title.is-lone + .err-hint {
+            margin-top: 16px;
+        }
+
+        .err-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px 28px;
+            margin-top: 36px;
+        }
+
+        /* Quiet actions next to the ink button, like the address on the home page */
+        .err-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 40px;
+            color: var(--text-2);
+            font-size: 16px;
             text-decoration: none;
-            color: #42a5f5;
+            white-space: nowrap;
+            transition: color var(--dur-fast) ease;
         }
 
-        .actions-container > a:hover {
-            text-decoration: underline;
+        .err-link .i {
+            color: var(--text-3);
         }
 
-        .horizontal-links-margin {
-            margin: 0 0.55rem;
+        .err-link:hover,
+        .err-link:hover .i {
+            color: var(--text);
         }
 
-        .horizontal-links-margin:before {
-            content: "|";
+        .btn .i,
+        .err-link .i {
+            transition-property: color, transform;
+            transition-duration: var(--dur-fast);
+            transition-timing-function: var(--ease-out);
         }
 
-        /* Icon */
+        @media (hover: hover) and (pointer: fine) {
+            .btn:hover .i-forward {
+                transform: translateX(3px);
+            }
 
-        .warning-icon-container {
-            position: absolute;
+            .err-link:hover .i-back {
+                transform: translateX(-3px);
+            }
+        }
+
+        @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+            .err-link:hover .i-retry,
+            .btn:hover .i-retry {
+                transform: rotate(40deg);
+            }
+        }
+
+        /* "Try again" keeps turning while the page reloads, a database timeout can take a while */
+        .is-busy {
+            cursor: progress;
+        }
+
+        .is-busy .i-retry {
+            animation: spin 800ms linear infinite;
+        }
+
+        /* The details under the actions when there is no side column: the two facts side by side */
+        .err-details {
+            max-width: 640px;
+            margin-top: 56px;
+        }
+
+        .err-details .facts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px 32px;
+        }
+
+        .err-details .facts > div {
+            padding-bottom: 0;
+        }
+
+        /* Side column: small headings, then facts or steps, blocks divided by hairlines */
+
+        .side-block {
+            padding: 48px var(--pad-x) 44px 40px;
+        }
+
+        .side-block + .side-block {
+            border-top: 1px solid var(--line);
+        }
+
+        .side-title {
+            margin-bottom: 20px;
+            color: var(--text);
+            font-size: 16px;
+            font-weight: 500;
+            line-height: 1.2;
+            letter-spacing: -.01em;
+        }
+
+        .facts > div {
+            padding: 14px 0;
+            border-top: 1px solid var(--line);
+        }
+
+        .facts > div:last-child {
+            padding-bottom: 0;
+        }
+
+        .facts dt {
+            margin-bottom: 4px;
+            color: var(--text-3);
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        .facts dd {
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+
+        .howto {
+            display: grid;
+            gap: 20px;
+            padding: 0;
+            list-style: none;
+        }
+
+        .howto li {
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .howto-icon {
+            display: inline-grid;
+            place-items: center;
+            flex: none;
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--line-2);
+            border-radius: 10px;
+            color: var(--text);
+        }
+
+        .howto-text {
+            min-width: 0;
+        }
+
+        .howto-title {
+            margin-bottom: 2px;
+            color: var(--text);
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .howto-sub {
+            color: var(--text-3);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .howto-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            max-width: 100%;
+            color: var(--text-2);
+            font-size: 14px;
+            text-decoration: none;
+            transition: color var(--dur-fast) ease;
+        }
+
+        .howto-link:hover {
+            color: var(--text);
+        }
+
+        .howto-link.mono {
+            font-size: 13.5px;
+            overflow-wrap: anywhere;
+        }
+
+        /* Live numbers from api/getstatus.php, like the facts under the home page's avatar wall.
+           They follow the links, so the column reads as one block; they leave when the answer never comes */
+        .side-live {
+            padding-top: 36px;
+        }
+
+        .side-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .side-stats > div {
+            min-width: 0;
+            padding-top: 14px;
+            border-top: 1px solid var(--line);
+        }
+
+        .side-stats dt {
             display: flex;
             align-items: center;
-            height: 100vh;
+            gap: 8px;
+            margin-bottom: 4px;
+            overflow: hidden;
+            color: var(--text-3);
+            font-size: 13px;
+            font-weight: 400;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
-        .warning-icon {
-            position: absolute;
-            left: -20vh;
-            opacity: .1;
-            font-size: 70vh;
-            z-index: -10;
+        .side-stats dd {
+            min-height: 33px;
+            color: var(--text);
+            font-size: 20px;
+            letter-spacing: -.02em;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .side-stats .of {
+            color: var(--text-3);
+        }
+
+        .side-offline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-top: 14px;
+            border-top: 1px solid var(--line);
+            color: var(--text-2);
+            font-size: 15px;
+        }
+
+        .skeleton {
+            display: block;
+            width: 56%;
+            height: 14px;
+            margin-top: 10px;
+            border-radius: 4px;
+            background: var(--bg-2);
+        }
+
+        [data-state="loading"] .side-offline,
+        [data-state="offline"] .side-stats,
+        [data-state="online"] .side-offline,
+        [data-state="online"] .skeleton,
+        [data-state="loading"] [data-live] {
+            display: none;
+        }
+
+        /* The website's sections, or with the database down what still works, as a row of cells:
+           the 1px gaps on the line color draw the hairlines */
+        .err-strip {
+            border-top: 1px solid var(--line);
+        }
+
+        .cells {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1px;
+            padding: 0;
+            list-style: none;
+            background: var(--line);
+        }
+
+        .cells.is-status {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .cell {
+            min-width: 0;
+            background: var(--bg);
+        }
+
+        /* A status cell is the cell itself, a section cell holds its link */
+        .cell-body,
+        .is-status .cell {
+            display: block;
+            height: 100%;
+            padding: 24px 24px 26px;
+        }
+
+        .cell:first-child .cell-body,
+        .is-status .cell:first-child {
+            padding-left: var(--pad-x);
+        }
+
+        .cell-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            color: var(--text-3);
+            font-size: 13.5px;
+            font-weight: 400;
+            line-height: 1.4;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .cell-value {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 28px;
+            color: var(--text);
+            font-size: 21px;
+            line-height: 1.3;
+            letter-spacing: -.02em;
+            white-space: nowrap;
+        }
+
+        .cell-sub {
+            margin-top: 4px;
+            color: var(--text-3);
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        a.cell-body {
+            color: var(--text);
+            text-decoration: none;
+            transition: background-color var(--dur-fast) ease;
+        }
+
+        a.cell-body:hover {
+            background-color: var(--bg-2);
+        }
+
+        a.cell-body:focus-visible {
+            outline-offset: -2px;
+            border-radius: 0;
+        }
+
+        .cell-value .i {
+            width: .8em;
+            height: .8em;
+            color: var(--text-3);
+            transition-property: color, transform;
+            transition-duration: var(--dur-fast);
+            transition-timing-function: ease, var(--ease-out);
+        }
+
+        a.cell-body:hover .cell-value .i {
+            color: var(--text);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            a.cell-body:hover .cell-value .i {
+                transform: translateX(3px);
+            }
+        }
+
+        /* Footer: the bottom line of the website's footer */
+        .site-footer {
+            border-top: 1px solid var(--line);
+            color: var(--text-3);
+            font-size: 13px;
+        }
+
+        .footer-bottom {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 8px 24px;
+            padding: 20px var(--pad-x) calc(24px + env(safe-area-inset-bottom));
+        }
+
+        .site-footer a {
+            color: var(--text-2);
+            text-decoration: none;
+            transition: color var(--dur-fast) ease;
+        }
+
+        .site-footer a:hover {
+            color: var(--text);
+        }
+
+        @media (min-width: 641px) {
+            /* Without the site title (no database) the credit keeps its place on the right */
+            .footer-credit:only-child {
+                margin-left: auto;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .err-hero {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .err-main {
+                padding-bottom: 52px;
+            }
+
+            .err-side {
+                border-left: 0;
+                border-top: 1px solid var(--line);
+            }
+
+            .side-block {
+                padding: 36px var(--pad-x) 40px;
+            }
+
+            .cells,
+            .cells.is-status {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .cell:nth-child(odd) .cell-body,
+            .is-status .cell:nth-child(odd) {
+                padding-left: var(--pad-x);
+            }
+
+            .cells.is-status .cell:last-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .err-main {
+                padding-top: 40px;
+            }
+
+            .live-state {
+                margin-bottom: 28px;
+            }
+
+            .err-title {
+                font-size: 24px;
+            }
+
+            .err-hint {
+                font-size: 17px;
+            }
+
+            .side-stats {
+                gap: 12px;
+            }
+
+            .side-stats dd {
+                font-size: 18px;
+            }
+
+            .cell-body,
+            .is-status .cell {
+                padding: 20px 16px 22px;
+            }
+
+            .cell-value {
+                font-size: 19px;
+            }
+
+            /* The sections turn into a list, one per line, the arrow at the end */
+            .cells:not(.is-status) {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .cells:not(.is-status) .cell-body {
+                padding: 18px var(--pad-x) 20px;
+            }
+
+            .cells:not(.is-status) .cell-label {
+                margin-bottom: 6px;
+            }
+
+            .cells:not(.is-status) .cell-value {
+                justify-content: space-between;
+            }
+        }
+
+        /* Motion: the code rolls in like the home page counter, then the text settles line by line
+           and the cells follow one after another */
+
+        @view-transition {
+            navigation: auto;
+        }
+
+        ::view-transition-old(root) {
+            animation: vt-out 160ms var(--ease-out) both;
+        }
+
+        ::view-transition-new(root) {
+            animation: vt-in var(--dur-enter) var(--ease-out) both;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .digit > span {
+                animation: roll 620ms var(--ease-out) both;
+                animation-delay: calc(120ms + var(--i, 0) * 60ms);
+            }
+
+            .is-word .digit > span {
+                animation-delay: calc(120ms + var(--i, 0) * 30ms);
+            }
+
+            .reveal {
+                animation: rise 520ms var(--ease-out) both;
+                animation-delay: calc(40ms + var(--i, 0) * 60ms);
+            }
+
+            /* The content moves, not the cells: their background draws the hairlines between them */
+            .cells > .cell > * {
+                animation: rise 520ms var(--ease-out) both;
+                animation-delay: calc(var(--base, 0ms) + var(--j, 0) * 40ms);
+            }
+
+            .skeleton {
+                animation: breathe 1.8s var(--ease-in-out) infinite;
+            }
+
+            /* The numbers arrive once: they settle into place instead of popping in */
+            [data-state="online"] .side-stats dd,
+            [data-state="offline"] .side-offline {
+                animation: rise 420ms var(--ease-out) both;
+            }
+
+            /* A slow ring on the dot: the site's one perpetual motion, it marks live data */
+            [data-state="online"] .live-dot::after {
+                content: "";
+                position: absolute;
+                inset: -4px;
+                border: 1px solid var(--live);
+                border-radius: 50%;
+                opacity: 0;
+                animation: live-ring 2.8s var(--ease-out) infinite;
+            }
+
+            /* The page transition already moves the page in, don't do it twice */
+            html.page-transition .reveal,
+            html.page-transition .cells > .cell > * {
+                animation: none;
+            }
+        }
+
+        /* Keep the fades, drop the movement */
+        @media (prefers-reduced-motion: reduce) {
+            ::view-transition-group(*),
+            ::view-transition-old(*),
+            ::view-transition-new(*) {
+                animation: none !important;
+            }
+
+            .digit > span,
+            .reveal,
+            .cells > .cell > *,
+            [data-state="online"] .side-stats dd,
+            [data-state="offline"] .side-offline {
+                animation: fade var(--dur-enter) ease both;
+                animation-delay: calc(40ms + var(--i, 0) * 40ms);
+            }
+
+            .btn,
+            .btn .i,
+            .err-link .i,
+            .cell-value .i {
+                transition-property: color, background-color, border-color;
+            }
+
+            .is-busy .i-retry {
+                animation-duration: 3s;
+            }
+        }
+
+        @keyframes roll {
+            from {
+                opacity: 0;
+                transform: translateY(100%);
+            }
+        }
+
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+        }
+
+        @keyframes fade {
+            from {
+                opacity: 0;
+            }
+        }
+
+        @keyframes vt-out {
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes vt-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+        }
+
+        @keyframes breathe {
+            0%, 100% {
+                opacity: .5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes live-ring {
+            0% {
+                opacity: .6;
+                transform: scale(.6);
+            }
+
+            80%, 100% {
+                opacity: 0;
+                transform: scale(1.7);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
 <body>
 
-<div class="flex">
+{* Phosphor icons (MIT), inlined so they work from any directory *}
+<svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+    <symbol id="i-arrow-right" viewBox="0 0 256 256"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></symbol>
+    <symbol id="i-arrow-clockwise" viewBox="0 0 256 256"><path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"/></symbol>
+    <symbol id="i-arrow-up-right" viewBox="0 0 256 256"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></symbol>
+    <symbol id="i-headset" viewBox="0 0 256 256"><path d="M201.89,54.66A103.43,103.43,0,0,0,128.79,24H128A104,104,0,0,0,24,128v56a24,24,0,0,0,24,24H64a24,24,0,0,0,24-24V144a24,24,0,0,0-24-24H40.36A88.12,88.12,0,0,1,190.54,65.93,87.39,87.39,0,0,1,215.65,120H192a24,24,0,0,0-24,24v40a24,24,0,0,0,24,24h24a24,24,0,0,1-24,24H136a8,8,0,0,0,0,16h56a40,40,0,0,0,40-40V128A103.41,103.41,0,0,0,201.89,54.66ZM64,136a8,8,0,0,1,8,8v40a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V136Zm128,56a8,8,0,0,1-8-8V144a8,8,0,0,1,8-8h24v56Z"/></symbol>
+    <symbol id="i-house" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></symbol>
+    <symbol id="i-tree-view" viewBox="0 0 256 256"><path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/></symbol>
+    <symbol id="i-book-open-text" viewBox="0 0 256 256"><path d="M232,48H160a40,40,0,0,0-32,16A40,40,0,0,0,96,48H24a8,8,0,0,0-8,8V200a8,8,0,0,0,8,8H96a24,24,0,0,1,24,24,8,8,0,0,0,16,0,24,24,0,0,1,24-24h72a8,8,0,0,0,8-8V56A8,8,0,0,0,232,48ZM96,192H32V64H96a24,24,0,0,1,24,24V200A39.81,39.81,0,0,0,96,192Zm128,0H160a39.81,39.81,0,0,0-24,8V88a24,24,0,0,1,24-24h64ZM160,88h40a8,8,0,0,1,0,16H160a8,8,0,0,1,0-16Zm48,40a8,8,0,0,1-8,8H160a8,8,0,0,1,0-16h40A8,8,0,0,1,208,128Zm0,32a8,8,0,0,1-8,8H160a8,8,0,0,1,0-16h40A8,8,0,0,1,208,160Z"/></symbol>
+    <symbol id="i-question" viewBox="0 0 256 256"><path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol>
+    <symbol id="i-globe-simple" viewBox="0 0 256 256"><path d="M128,24h0A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm87.62,96H175.79C174,83.49,159.94,57.67,148.41,42.4A88.19,88.19,0,0,1,215.63,120ZM96.23,136h63.54c-2.31,41.61-22.23,67.11-31.77,77C118.45,203.1,98.54,177.6,96.23,136Zm0-16C98.54,78.39,118.46,52.89,128,43c9.55,9.93,29.46,35.43,31.77,77Zm11.36-77.6C96.06,57.67,82,83.49,80.21,120H40.37A88.19,88.19,0,0,1,107.59,42.4ZM40.37,136H80.21c1.82,36.51,15.85,62.33,27.38,77.6A88.19,88.19,0,0,1,40.37,136Zm108,77.6c11.53-15.27,25.56-41.09,27.38-77.6h39.84A88.19,88.19,0,0,1,148.41,213.6Z"/></symbol>
+    <symbol id="i-hard-drives" viewBox="0 0 256 256"><path d="M208,136H48a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,64H48V152H208v48Zm0-160H48A16,16,0,0,0,32,56v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V56A16,16,0,0,0,208,40Zm0,64H48V56H208v48ZM192,80a12,12,0,1,1-12-12A12,12,0,0,1,192,80Zm0,96a12,12,0,1,1-12-12A12,12,0,0,1,192,176Z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></symbol>
+</svg>
 
-    <div class="warning-icon-container">
-        <i class="fas fa-exclamation-triangle warning-icon"></i>
+<div class="frame">
+
+<header class="site-header">
+    <div class="site-header-inner">
+        {* Without the database there is no site name, the icon alone still leads home *}
+        <a class="brand" href="{$root}" n:attr="aria-label => $brand === '' ? $t['ERRORPAGE_HOME']">
+            <img src="{$root}img/icons/defaulticon-64.png" width="26" height="26" alt="">
+            <span n:if="$brand !== ''" class="brand-name">{$brand}</span>
+        </a>
+
+        {* With the database down those pages fail as well *}
+        <nav n:if="!$isDbError" class="topnav" aria-label="{$navLabel}">
+            <ul>
+                <li n:foreach="$navLinks as $link"><a class="topnav-link" href="{$root}{$link[0]}">{$link[1]}</a></li>
+            </ul>
+        </nav>
+
+        <a n:if="$tsAddress !== ''" class="btn btn-sm" href="ts3server://{$tsAddress|escapeUrl}">{$connectLabel}</a>
     </div>
+</header>
 
-    <div class="container">
-        <div class="errorcode" n:ifcontent>
-            {$errorcode}
+{* What the server reported, for the visitor to pass on to the admin: in the side column next to the
+   voice server, otherwise under the actions. With the database down the time is in the status cells *}
+{define errDetails}
+    <section class="{$class} reveal" style="--i: {$i}" aria-labelledby="err-details-title">
+        <h2 class="side-title" id="err-details-title">{$t["ERRORPAGE_DETAILS"]}</h2>
+        <dl class="facts">
+            <div>
+                <dt>{$t["ERRORPAGE_REASON"]}</dt>
+                <dd>{$description}</dd>
+            </div>
+            <div n:if="$showTime">
+                <dt>{$t["ERRORPAGE_SERVER_TIME"]}</dt>
+                <dd>{date("Y-m-d H:i:s T", $now)}</dd>
+            </div>
+        </dl>
+    </section>
+{/define}
+
+<main class="err" id="main">
+    <section n:class="err-hero, !$hasSide ? is-solo">
+        <div class="err-main">
+            <p n:if="$requested !== ''" class="live-state reveal" data-severity="{$severity}">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span class="sr-only">{$t["ERRORPAGE_REQUESTED"]}:</span>
+                <span class="err-path">{$requested}</span>
+            </p>
+
+            <p n:if="$codeChars" n:class="err-code, !preg_match('~^\d+$~', $code) ? is-word">
+                <span class="sr-only">{$code}</span>
+                <span class="digit" n:foreach="$codeChars as $i => $char" aria-hidden="true"><span style="--i: {$i}">{$char}</span></span>
+            </p>
+
+            {* The text follows the code, one line after another *}
+            {var $step = $codeChars ? min(count($codeChars), 4) + 1 : 1}
+
+            <h1 n:class="err-title, reveal, !$codeChars ? is-lone" style="--i: {$step}">{$name}</h1>
+            <p n:if="$hint" class="err-hint reveal" style="--i: {$step + 1}">{$hint}</p>
+
+            <div class="err-actions reveal" style="--i: {$step + 2}">
+                {if $primary === "home"}
+                    <a class="btn btn-lg" href="{$root}">{$t["ERRORPAGE_HOME"]}<svg class="i i-forward" aria-hidden="true" focusable="false"><use href="#i-arrow-right"></use></svg></a>
+                    <a class="err-link" href="{$root}" data-back><svg class="i i-back" aria-hidden="true" focusable="false"><use href="#i-arrow-left"></use></svg>{$t["ERRORPAGE_GO_BACK"]}</a>
+                    <a class="err-link" href="" data-retry><svg class="i i-retry" aria-hidden="true" focusable="false"><use href="#i-arrow-clockwise"></use></svg>{$t["ERRORPAGE_TRY_AGAIN"]}</a>
+                {elseif $primary === "back"}
+                    <a class="btn btn-lg" href="{$root}" data-back><svg class="i i-back" aria-hidden="true" focusable="false"><use href="#i-arrow-left"></use></svg>{$t["ERRORPAGE_GO_BACK"]}</a>
+                    <a class="err-link" href="{$root}">{$t["ERRORPAGE_HOME"]}</a>
+                {else}
+                    <a class="btn btn-lg" href="" data-retry><svg class="i i-retry" aria-hidden="true" focusable="false"><use href="#i-arrow-clockwise"></use></svg>{$t["ERRORPAGE_TRY_AGAIN"]}</a>
+                    <a class="err-link" href="{$root}" data-back><svg class="i i-back" aria-hidden="true" focusable="false"><use href="#i-arrow-left"></use></svg>{$t["ERRORPAGE_GO_BACK"]}</a>
+                    <a class="err-link" href="{$root}">{$t["ERRORPAGE_HOME"]}</a>
+                {/if}
+            </div>
+
+            {if $detailsInMain}
+                {include errDetails, class => "err-details", i => $step + 3, t => $t, description => $description, showTime => !$isDbError, now => $now}
+            {/if}
         </div>
 
-        {* Add dark-color when description is not set *}
-        <div n:class="errorname, !$description ? dark-color" n:ifcontent>
-            {$errorname}
-        </div>
+        <div n:if="$hasSide" class="err-side">
+            {if $hasDescription && !$detailsInMain}
+                {include errDetails, class => "side-block", i => 1, t => $t, description => $description, showTime => !$isDbError, now => $now}
+            {/if}
 
-        <div class="errordescription dark-color" n:ifcontent>
-            {$description}
-        </div>
+            {* The voice server works on its own: its address and live numbers when the settings are
+               known, otherwise the reminder that a website fault does not take it down *}
+            <section n:if="$showTs" class="side-block reveal" style="--i: 2" aria-labelledby="err-ts-title">
+                <h2 class="side-title" id="err-ts-title">{$t["ERRORPAGE_TS_TITLE"]}</h2>
+                <ul class="howto">
+                    <li>
+                        <span class="howto-icon" aria-hidden="true"><svg class="i"><use href="#i-headset"></use></svg></span>
+                        <div class="howto-text">
+                            {if $tsAddress !== ""}
+                                <p class="howto-title">{$t["ERRORPAGE_TS_CONNECT"]}</p>
+                                <a class="howto-link mono" href="ts3server://{$tsAddress|escapeUrl}">{$tsAddress}</a>
+                            {else}
+                                <p class="howto-title">{$t["ERRORPAGE_TS_APART"]}</p>
+                                <p class="howto-sub">{$t["ERRORPAGE_TS_APART_HINT"]}</p>
+                            {/if}
+                        </div>
+                    </li>
+                    <li>
+                        <span class="howto-icon" aria-hidden="true"><svg class="i"><use href="#i-arrow-up-right"></use></svg></span>
+                        <div class="howto-text">
+                            <p class="howto-title">{$t["ERRORPAGE_TS_DOWNLOAD"]}</p>
+                            <a class="howto-link" href="https://teamspeak.com/downloads/" target="_blank" rel="noopener">teamspeak.com</a>
+                        </div>
+                    </li>
+                </ul>
 
-        <div class="actions-container">
-            <a href="#" onclick="location = location">Try again</a>
-            <span class="horizontal-links-margin"></span>
-            <a href="#" onclick="history.back()">Go back</a>
+                {* Filled from the same answer js/status.js reads on the home page. Hidden without JavaScript *}
+                <div n:if="$tsAddress !== ''" class="side-live" data-live-stats="{$root}api/getstatus.php" data-state="loading" aria-live="polite" hidden>
+                    <dl class="side-stats">
+                        <div>
+                            <dt><span class="live-dot" aria-hidden="true"></span>{$t["ERRORPAGE_TS_ONLINE"]}</dt>
+                            <dd><span class="skeleton"></span><span data-live="online"></span><span class="of" data-live> / <span data-live="max"></span></span></dd>
+                        </div>
+                        <div>
+                            <dt>{$t["ERRORPAGE_TS_FREE"]}</dt>
+                            <dd><span class="skeleton"></span><span data-live="free"></span></dd>
+                        </div>
+                        <div>
+                            <dt>{$t["ERRORPAGE_TS_CHANNELS"]}</dt>
+                            <dd><span class="skeleton"></span><span data-live="channels"></span></dd>
+                        </div>
+                    </dl>
+
+                    <p class="side-offline">
+                        <span class="live-dot is-down" aria-hidden="true"></span>{$t["ERRORPAGE_TS_OFFLINE"]}
+                    </p>
+                </div>
+            </section>
         </div>
+    </section>
+
+    {var $cellsStart = ($step + ($detailsInMain ? 4 : 3)) * 60 + 40}
+
+    {if $isDbError}
+        {* What still works: this answer came from the web server, the database did not answer *}
+        <section class="err-strip" aria-label="{$t["ERRORPAGE_STATUS"]}">
+            <dl class="cells is-status" style="--base: {$cellsStart}ms">
+                <div class="cell" style="--j: 0">
+                    <dt class="cell-label"><svg class="i i-sm" aria-hidden="true" focusable="false"><use href="#i-globe-simple"></use></svg>{$t["ERRORPAGE_STATUS_WEB"]}</dt>
+                    <dd class="cell-value"><span class="live-dot is-up" aria-hidden="true"></span>{$t["ERRORPAGE_STATUS_WEB_OK"]}</dd>
+                </div>
+                <div class="cell" style="--j: 1">
+                    <dt class="cell-label"><svg class="i i-sm" aria-hidden="true" focusable="false"><use href="#i-hard-drives"></use></svg>{$t["ERRORPAGE_STATUS_DB"]}</dt>
+                    <dd class="cell-value"><span class="live-dot is-down" aria-hidden="true"></span>{$dbState}</dd>
+                </div>
+                <div class="cell" style="--j: 2">
+                    <dt class="cell-label"><svg class="i i-sm" aria-hidden="true" focusable="false"><use href="#i-clock"></use></svg>{$t["ERRORPAGE_SERVER_TIME"]}</dt>
+                    <dd class="cell-value tabular">{date("H:i:s", $now)}</dd>
+                    <dd class="cell-sub">{date("Y-m-d T", $now)}</dd>
+                </div>
+            </dl>
+        </section>
+    {else}
+        {* The rest of the website still works *}
+        <nav class="err-strip" aria-label="{$t["ERRORPAGE_SECTIONS"]}">
+            <ul class="cells" style="--base: {$cellsStart}ms">
+                {* Named the way the header names them, in the site's words when they can be read *}
+                {foreach [
+                    ["", "house", "ERRORPAGE_DEST_HOME", null],
+                    ["viewer.php", "tree-view", "ERRORPAGE_DEST_CHANNELS", "NAV_VIEWER"],
+                    ["rules.php", "book-open-text", "ERRORPAGE_DEST_RULES", "NAV_RULES"],
+                    ["faq.php", "question", "ERRORPAGE_DEST_FAQ", "NAV_FAQ"],
+                ] as $j => $dest}
+                    {var $destName = ($canTranslate && $dest[3] ? __get($dest[3], [], true) : null) ?? $t[$dest[2]]}
+                    <li class="cell" style="--j: {$j}">
+                        <a class="cell-body" href="{$root}{$dest[0]}">
+                            <span class="cell-label"><svg class="i i-sm" aria-hidden="true" focusable="false"><use href="#i-{$dest[1]}"></use></svg>{$t[$dest[2] . "_HINT"]}</span>
+                            <span class="cell-value">{$destName}<svg class="i" aria-hidden="true" focusable="false"><use href="#i-arrow-right"></use></svg></span>
+                        </a>
+                    </li>
+                {/foreach}
+            </ul>
+        </nav>
+    {/if}
+</main>
+
+<footer class="site-footer">
+    <div class="footer-bottom">
+        <span n:if="$siteTitle !== ''">&copy; {date("Y")} {$siteTitle}</span>
+
+        <span class="footer-credit">
+            <!-- Please respect the amount of work we've put for free into this project and leave the authors in the footer. Thanks! -->
+            <a href="https://github.com/Wruczek/ts-website" target="_blank" rel="noopener">ts-website</a> v {\__TSWEBSITE_VERSION} &middot;
+            &copy; <a href="https://wruczek.tech/?source=tsw" target="_blank" rel="noopener">Wruczek</a> 2017 - 2025
+        </span>
     </div>
+</footer>
 
 </div>
+
+<script>
+    (function () {
+        // "Go back" steps back through the history, a tab opened on this page goes to the home page instead
+        var back = document.querySelectorAll("[data-back]")
+        var retry = document.querySelectorAll("[data-retry]")
+        var i
+
+        for (i = 0; i < back.length; i++) {
+            back[i].addEventListener("click", function (e) {
+                if (history.length > 1) {
+                    e.preventDefault()
+                    history.back()
+                }
+            })
+        }
+
+        // "Try again" loads the same address (a GET, so a failed form is never sent twice)
+        // and shows it is working while the server answers
+        for (i = 0; i < retry.length; i++) {
+            retry[i].addEventListener("click", function () {
+                this.classList.add("is-busy")
+                this.setAttribute("aria-disabled", "true")
+            })
+        }
+
+        // Coming back from the browser cache must not keep the busy state
+        window.addEventListener("pageshow", function (e) {
+            if (e.persisted) {
+                for (i = 0; i < retry.length; i++) {
+                    retry[i].classList.remove("is-busy")
+                    retry[i].removeAttribute("aria-disabled")
+                }
+            }
+        })
+
+        // The server's live numbers (the same answer js/status.js reads on the home page). A server
+        // that does not answer is worth saying; a request that fails on the way just drops the block
+        var live = document.querySelector("[data-live-stats]")
+
+        if (live && window.fetch) {
+            live.hidden = false
+
+            fetch(live.getAttribute("data-live-stats"), { headers: { "Accept": "application/json" }, credentials: "same-origin" })
+                .then(function (response) {
+                    return response.ok ? response.json() : null
+                })
+                .then(function (json) {
+                    var data = json && json.success ? json.data : null
+
+                    if (json && json.success === false) {
+                        live.setAttribute("data-state", "offline")
+                        return
+                    }
+
+                    if (!data || typeof data.clientsOnline !== "number" || typeof data.maxClients !== "number") {
+                        live.hidden = true
+                        return
+                    }
+
+                    var values = {
+                        online: data.clientsOnline,
+                        max: data.maxClients,
+                        free: Math.max(data.maxClients - data.clientsOnline, 0),
+                        channels: typeof data.channelCount === "number" ? data.channelCount : ""
+                    }
+
+                    for (var key in values) {
+                        live.querySelector('[data-live="' + key + '"]').textContent = values[key]
+                    }
+
+                    live.setAttribute("data-state", "online")
+                })
+                .catch(function () {
+                    live.hidden = true
+                })
+        }
+    })()
+</script>
 
 </body>
 </html>

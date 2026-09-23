@@ -1,0 +1,949 @@
+/* ==========================================================================
+   Group assigner (templates/assigner.latte, js/assigner.js)
+   A hero split (title and account | groups on the server or how to get them),
+   a row of fact cells, the categories as a two-column grid of cells, and a
+   save bar that ends the form and follows the viewport while there are changes
+   ========================================================================== */
+
+/* Hero: two equal columns, so its hairline lines up with the category grid below */
+
+.assigner-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.assigner-hero.is-single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.assigner-hero-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 56px var(--pad-x) 48px;
+}
+
+.assigner-hero-main > * {
+    max-width: 100%;
+}
+
+.assigner-hero.is-single .assigner-hero-main > * {
+    max-width: 720px;
+}
+
+.assigner-hero-main .page-sub {
+    max-width: 30em;
+}
+
+.assigner-hero .side-block {
+    padding-bottom: 48px;
+}
+
+/* Short states (nothing below the hero): the hero reaches down to the footer, so the
+   column line never stops in mid-air. body.latte ends <main> with a hidden #main-end */
+.page:has(> .assigner-hero + #main-end) {
+    display: flex;
+    flex-direction: column;
+}
+
+.assigner-hero:has(+ #main-end) {
+    flex: 1 0 auto;
+}
+
+/* Keyboard focus stops below the sticky header instead of under it; the save bar
+   reserves its own height at the bottom while it is stuck there (js/assigner.js) */
+html:has(#assigner-form) {
+    scroll-padding-top: calc(var(--header-h) + 16px);
+}
+
+/* Whatever follows the hero draws the line under it, so dismissing a notice can
+   glide everything below up without leaving a hairline behind (js/assigner.js) */
+.assigner-hero + * {
+    border-top: 1px solid var(--line);
+}
+
+.assigner-hero .alert,
+.assigner-state {
+    margin: 28px 0 0;
+}
+
+.assigner-hero .alert + .alert {
+    margin-top: 12px;
+}
+
+.assigner-state .alert {
+    margin: 0;
+}
+
+.assigner-state.empty-state {
+    padding: 0;
+}
+
+.assigner-required {
+    margin: 6px 0 0;
+    color: var(--text-2);
+    font-size: 14.5px;
+}
+
+.assigner-invite {
+    margin-top: 32px;
+}
+
+/* The account that is picking: pinned to the bottom so both columns end on one line */
+.assigner-user {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    margin-top: auto;
+    padding-top: 36px;
+}
+
+.assigner-user-text {
+    min-width: 0;
+}
+
+.assigner-user-name {
+    margin: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.assigner-user-meta {
+    margin: 2px 0 0;
+    color: var(--text-3);
+    font-size: 13.5px;
+    line-height: 1.4;
+}
+
+.assigner-user-meta .mono {
+    margin-left: 6px;
+    padding-left: 8px;
+    border-left: 1px solid var(--line-2);
+    font-size: 12.5px;
+}
+
+/* Side: the visitor's groups as the server has them now */
+
+.assigner-side-count {
+    color: var(--text-3);
+    font-size: 14px;
+}
+
+.assigner-owned {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.assigner-owned > li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.assigner-owned-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 15px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.assigner-owned-category {
+    flex: none;
+    color: var(--text-3);
+    font-size: 13px;
+}
+
+.assigner-howto-note {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 14px;
+}
+
+/* Group icon: the 16px TeamSpeak original in an outlined square, or a quiet tag */
+
+.assigner-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    color: var(--text-3);
+}
+
+.assigner-icon .i {
+    width: 14px;
+    height: 14px;
+}
+
+.assigner-icon img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+/* Facts */
+
+.assigner-facts {
+    border-bottom: 1px solid var(--line);
+}
+
+.assigner-facts .cells {
+    grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
+}
+
+.assigner-facts .cell {
+    padding: 24px 40px 26px;
+}
+
+.assigner-facts .cell:first-child {
+    padding-left: var(--pad-x);
+}
+
+.assigner-facts dd .i {
+    color: inherit;
+}
+
+.assigner-wait-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--away);
+}
+
+.assigner-facts .cell.is-waiting dt .i {
+    color: var(--away);
+}
+
+/* Counters that roll like the online counter on the home page; clip-path keeps
+   the text baseline where overflow: hidden would move it */
+.assigner-used {
+    position: relative;
+    display: inline-block;
+    clip-path: inset(0 -2px);
+}
+
+.assigner-used > span {
+    display: inline-block;
+}
+
+.assigner-used > .is-leaving {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Categories: cells divided by hairlines, two columns */
+
+.assigner-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+}
+
+.assigner-category {
+    min-width: 0;
+    padding: 36px 40px 40px;
+    background: var(--bg);
+}
+
+.assigner-category:nth-child(odd) {
+    padding-left: var(--pad-x);
+}
+
+.assigner-category:nth-child(even),
+.assigner-category.is-wide {
+    padding-right: var(--pad-x);
+}
+
+.assigner-category.is-wide {
+    grid-column: 1 / -1;
+}
+
+/* Columns of the wide cell line up with the cells above it */
+.assigner-category.is-wide .assigner-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: calc(80px + 1px);
+}
+
+.assigner-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px 24px;
+    margin-bottom: 22px;
+}
+
+.assigner-head-text {
+    min-width: 0;
+}
+
+.assigner-name {
+    margin: 0;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: -.02em;
+}
+
+/* FontAwesome icon from the assigner config (the only place new markup still shows one) */
+.assigner-name > i {
+    width: 1.3em;
+    margin-right: .45em;
+    color: var(--text-3);
+    font-size: 15px;
+    text-align: center;
+    vertical-align: .08em;
+}
+
+.assigner-hint {
+    margin: 4px 0 0;
+    color: var(--text-3);
+    font-size: 14px;
+    transition: color var(--dur-fast) ease;
+}
+
+.assigner-gauge {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    padding-top: 2px;
+}
+
+.assigner-count {
+    margin: 0;
+    color: var(--text);
+    font-size: 20px;
+    line-height: 1.2;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    transition: color var(--dur-fast) ease;
+}
+
+.assigner-count-max {
+    color: var(--text-3);
+}
+
+/* One slot per allowed group, striped like the home level meter; a filled slot
+   is wiped in from the left */
+.assigner-meter {
+    display: flex;
+    justify-content: flex-end;
+    gap: 7px;
+    width: 180px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.assigner-slot {
+    position: relative;
+    flex: 0 1 32px;
+    min-width: 4px;
+    height: 10px;
+    background: repeating-linear-gradient(90deg, var(--bg-3) 0 4px, transparent 4px 7px);
+}
+
+.assigner-slot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(90deg, var(--text) 0 4px, transparent 4px 7px);
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path var(--dur-fast) var(--ease-out);
+}
+
+.assigner-slot.is-filled::after {
+    clip-path: inset(0);
+}
+
+.assigner-category.is-over .assigner-count,
+.assigner-category.is-over .assigner-count-max,
+.assigner-category.is-over .assigner-hint {
+    color: var(--danger);
+}
+
+/* More than ten slots: one continuous meter, the level meter on the home page in small */
+.assigner-meter.is-continuous {
+    position: relative;
+    height: 10px;
+    background: repeating-linear-gradient(90deg, var(--bg-3) 0 4px, transparent 4px 7px);
+}
+
+.assigner-meter.is-continuous::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(90deg, var(--text) 0 4px, transparent 4px 7px);
+    clip-path: inset(0 calc(100% - var(--fill, 0) * 100%) 0 0);
+    transition: clip-path var(--dur-fast) var(--ease-out);
+}
+
+.assigner-category.is-over .assigner-slot::after,
+.assigner-category.is-over .assigner-meter.is-continuous::after {
+    background: repeating-linear-gradient(90deg, var(--danger) 0 4px, transparent 4px 7px);
+}
+
+/* Groups: hairline rows. In the form each row is a <label> with the real checkbox stretched over it */
+
+.assigner-options {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.assigner-options > li {
+    min-width: 0;
+    border-top: 1px solid var(--line);
+}
+
+.assigner-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 54px;
+    margin: 0 -12px;
+    padding: 12px;
+    border-radius: var(--radius);
+    color: var(--text-2);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.35;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.assigner-options > li.assigner-option {
+    margin: 0;
+    padding-inline: 0;
+    border-radius: 0;
+}
+
+label.assigner-option {
+    cursor: pointer;
+    transition: background-color var(--dur-fast) ease;
+}
+
+.assigner-input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.assigner-input:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 0;
+    border-radius: var(--radius);
+}
+
+.assigner-option-name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    transition: color var(--dur-press) ease;
+}
+
+.is-catalog .assigner-option-name,
+.assigner-input:checked ~ .assigner-option-name {
+    color: var(--text);
+}
+
+.assigner-members {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-3);
+    font-size: 14px;
+}
+
+.assigner-members .avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    font-size: 11px;
+    transition: box-shadow var(--dur-fast) ease;
+}
+
+.assigner-members .avatar-stack .avatar + .avatar {
+    margin-left: -6px;
+}
+
+.assigner-members-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 2.2em;
+}
+
+.assigner-members-count .i {
+    display: none;
+}
+
+/* The check box: a hairline square that fills with ink; the mark wipes in from the left */
+.assigner-box {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid var(--line-2);
+    border-radius: 6px;
+    transition: background-color var(--dur-press) ease, border-color var(--dur-press) ease;
+}
+
+/* A line that differs from what the server has gets the same amber dot as the bar */
+.assigner-option-name::after {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 10px;
+    border-radius: 50%;
+    background: var(--away);
+    vertical-align: .18em;
+    opacity: 0;
+    transform: scale(.6);
+    transition: opacity var(--dur-press) var(--ease-out), transform var(--dur-press) var(--ease-out);
+}
+
+.assigner-option.is-changed .assigner-option-name::after {
+    opacity: 1;
+    transform: none;
+}
+
+.assigner-check {
+    width: 14px;
+    height: 14px;
+    color: var(--ink-fg);
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transition: opacity var(--dur-press) var(--ease-out), clip-path 0s linear var(--dur-press);
+}
+
+.assigner-input:checked ~ .assigner-box {
+    border-color: var(--ink);
+    background-color: var(--ink);
+}
+
+.assigner-input:checked ~ .assigner-box .assigner-check {
+    opacity: 1;
+    clip-path: inset(0);
+    transition: opacity 0s, clip-path var(--dur-fast) var(--ease-out);
+}
+
+/* Cooldown: the choice is visible but locked */
+.assigner-option.is-disabled,
+.assigner-option.is-disabled .assigner-input {
+    cursor: not-allowed;
+}
+
+.assigner-option.is-disabled .assigner-option-name,
+.assigner-option.is-disabled .assigner-input:checked ~ .assigner-option-name {
+    color: var(--text-3);
+}
+
+.assigner-option.is-disabled .assigner-box {
+    opacity: .45;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    label.assigner-option:not(.is-disabled):hover {
+        background-color: var(--bg-2);
+    }
+
+    label.assigner-option:not(.is-disabled):hover .assigner-option-name {
+        color: var(--text);
+    }
+
+    label.assigner-option:not(.is-disabled):hover .assigner-input:not(:checked) ~ .assigner-box {
+        border-color: var(--text-3);
+    }
+
+    /* Cut-out rings follow the row fill */
+    label.assigner-option:not(.is-disabled):hover .avatar-stack .avatar {
+        box-shadow: 0 0 0 2px var(--bg-2);
+    }
+}
+
+/* Save bar: the last row of the form. With unsaved changes it sticks to the bottom
+   of the viewport and slides in from below (js/assigner.js) */
+
+.assigner-bar {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    min-height: 76px;
+    padding: 14px var(--pad-x) calc(14px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+    transition: transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+}
+
+.assigner-bar.is-sticky {
+    position: sticky;
+    bottom: 0;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* Start position for the slide in; removed on the next frame so the transition runs */
+.assigner-bar.is-entering {
+    transform: translateY(100%);
+    transition: none;
+}
+
+.assigner-bar.is-instant {
+    transition: none;
+}
+
+/* Leaving is a little quicker than arriving */
+.assigner-bar.is-leaving {
+    transform: translateY(100%);
+    transition-duration: var(--dur-fast);
+}
+
+.assigner-bar-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.assigner-reset {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity var(--dur-press) var(--ease-out),
+        visibility 0s linear var(--dur-press),
+        background-color var(--dur-fast) ease,
+        border-color var(--dur-fast) ease,
+        color var(--dur-fast) ease,
+        transform var(--dur-press) var(--ease-out);
+}
+
+.assigner.is-dirty .assigner-reset {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+/* Locked while the page posts */
+.assigner.is-dirty .assigner-reset:disabled {
+    opacity: .4;
+}
+
+.assigner-save {
+    position: relative;
+    min-width: 128px;
+}
+
+.assigner-save-label,
+.assigner-spinner {
+    transition: opacity var(--dur-press) ease;
+}
+
+.assigner-save .assigner-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    opacity: 0;
+}
+
+/* While the page posts: keep the button's size, swap the label for a spinner */
+.assigner-save.is-saving {
+    pointer-events: none;
+}
+
+.assigner-save.is-saving .assigner-save-label {
+    opacity: 0;
+}
+
+.assigner-save.is-saving .assigner-spinner {
+    opacity: 1;
+    animation: spin 800ms linear infinite;
+}
+
+/* One slot for the notes: they cross-fade in place instead of pushing each other */
+.assigner-status {
+    display: grid;
+    flex: 1 1 260px;
+    min-width: 0;
+    margin: 0;
+    color: var(--text-3);
+    font-size: 14.5px;
+    line-height: 1.45;
+}
+
+.assigner-note {
+    display: inline-flex;
+    grid-area: 1 / 1;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition:
+        opacity var(--dur-press) var(--ease-out),
+        transform var(--dur-press) var(--ease-out),
+        visibility 0s linear var(--dur-press);
+}
+
+.assigner-note.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-duration: var(--dur-fast), var(--dur-fast), 0s;
+    transition-delay: 0s;
+}
+
+.assigner-dirty {
+    color: var(--text);
+}
+
+.assigner-dirty-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--away);
+}
+
+.invalid-groups-alert {
+    color: var(--danger);
+}
+
+.invalid-groups-alert .i {
+    flex: none;
+}
+
+/* Post-save notice: Bootstrap fades it out linearly; ours follows the site curve */
+.assigner-notice.fade {
+    transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+/* Dismissing a notice runs a same-document view transition (js/assigner.js): the page
+   itself stays put, the notice fades and whatever was under it glides up */
+html.assigner-vt::view-transition-old(root),
+html.assigner-vt::view-transition-new(root) {
+    animation: none;
+}
+
+html.assigner-vt::view-transition-group(*) {
+    animation-duration: var(--dur);
+    animation-timing-function: var(--ease-in-out);
+}
+
+/* The notice is gone before the content under it arrives */
+html.assigner-vt::view-transition-old(assigner-vt-leaving) {
+    animation-duration: var(--dur-press);
+    animation-timing-function: var(--ease-out);
+}
+
+@media (max-width: 1000px) {
+    .assigner-hero {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .assigner-hero .side-block {
+        padding-bottom: 40px;
+    }
+}
+
+@media (max-width: 900px) {
+    .assigner-facts .cells {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .assigner-facts .cell {
+        padding: 20px 20px 22px;
+    }
+
+    /* Two narrow columns: labels and notes wrap in balanced lines instead of being cut.
+       The value keeps its centred line, so the cooldown dot sits on the digits */
+    .assigner-facts .cells dt,
+    .assigner-facts .cells dd.cell-sub {
+        align-items: flex-start;
+        white-space: normal;
+        text-wrap: balance;
+    }
+
+    .assigner-facts .cells dd {
+        line-height: 1.3;
+    }
+
+    .assigner-facts .cells dd:not(.cell-sub) {
+        white-space: normal;
+    }
+
+    .assigner-facts .cells dt .i {
+        margin-top: .28em;
+    }
+
+    .assigner-facts .cell:nth-child(odd) {
+        padding-left: var(--pad-x);
+    }
+
+    /* tsw.css widens an odd last cell; a complete last pair stays as it is */
+    .assigner-facts .cell:last-child:nth-child(even) {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 760px) {
+    .assigner-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .assigner-category,
+    .assigner-category:nth-child(odd),
+    .assigner-category:nth-child(even) {
+        padding: 28px var(--pad-x) 30px;
+    }
+
+    .assigner-category.is-wide .assigner-options {
+        display: block;
+    }
+}
+
+@media (max-width: 640px) {
+    .assigner-hero-main {
+        padding-top: 44px;
+        padding-bottom: 40px;
+    }
+
+    .assigner-head {
+        margin-bottom: 18px;
+    }
+
+    .assigner-bar {
+        gap: 10px 16px;
+        padding-top: 12px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+
+    .assigner-status {
+        flex-basis: 100%;
+        font-size: 14px;
+    }
+
+    .assigner-bar-actions {
+        width: 100%;
+    }
+
+    .assigner-bar-actions .btn {
+        flex: 1;
+    }
+
+    /* Both buttons share the row here, so reset stays in place, disabled until there is something to undo */
+    .assigner-reset {
+        opacity: .4;
+        visibility: visible;
+    }
+
+    .assigner-invite .assigner-login {
+        width: 100%;
+    }
+}
+
+/* Narrower rows keep the count and drop the monograms */
+@media (max-width: 1000px) {
+    .assigner-meter {
+        width: 120px;
+    }
+
+    .assigner-members .avatar-stack {
+        display: none;
+    }
+
+    .assigner-members-count {
+        min-width: 3.4em;
+    }
+
+    .assigner-members-count .i {
+        display: inline-block;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Keep the fades, drop the movement */
+    .assigner-note,
+    .assigner-bar.is-entering,
+    .assigner-bar.is-leaving,
+    .assigner-option-name::after {
+        transform: none !important;
+    }
+
+    .assigner-bar.is-entering,
+    .assigner-bar.is-leaving {
+        opacity: 0;
+    }
+
+    .assigner-check,
+    .assigner-input:checked ~ .assigner-box .assigner-check,
+    .assigner-slot::after {
+        transition: opacity var(--dur-press) var(--ease-out);
+    }
+
+    /* A growing fill is movement; the continuous meter just shows the new value */
+    .assigner-meter.is-continuous::after {
+        transition: none;
+    }
+
+    .assigner-slot::after {
+        clip-path: none;
+        opacity: 0;
+    }
+
+    .assigner-slot.is-filled::after {
+        opacity: 1;
+    }
+
+    .assigner-check {
+        clip-path: none;
+    }
+
+    .assigner-save.is-saving .assigner-spinner {
+        animation-duration: 3s;
+    }
+}

@@ -1,0 +1,43 @@
+<?php
+/*
+ * Strings shipped with the website for the channel viewer (viewer.php).
+ * Translations stored in the database always win.
+ */
+return [
+    "VIEWER_PAGE_SUB" => "Every channel on the server and who is in it right now.",
+    "VIEWER_FACT_SERVER" => "Server",
+    "VIEWER_STATE_LOADING" => "Checking",
+    "VIEWER_STATE_ONLINE" => "Online",
+    "VIEWER_STATE_OFFLINE" => "Unreachable",
+    "VIEWER_FACT_BUSIEST" => "Busiest channel",
+    "VIEWER_FACT_NOBODY" => "Nobody yet",
+    "VIEWER_IN_CHANNEL" => "In the channel now: {0}",
+    "VIEWER_ON_SERVER" => "On the server now: {0}",
+    "VIEWER_NOBODY_ONLINE" => "Nobody is on the server right now.",
+    "VIEWER_SEARCH_TITLE" => "Find",
+    "VIEWER_SEARCH_LABEL" => "Channel or nickname",
+    "VIEWER_SEARCH_CLEAR" => "Clear the search",
+    "VIEWER_SEARCH_MATCHES" => "Matches: {0}",
+    "VIEWER_SEARCH_EMPTY" => "Nothing found",
+    "VIEWER_SEARCH_EMPTY_TEXT" => "No channel name or nickname contains “{0}”.",
+    "VIEWER_SEARCH_EMPTY_HIDDEN" => "Some empty channels match, but empty channels are hidden.",
+    "VIEWER_SEARCH_RESET" => "Reset the search",
+    "VIEWER_LEGEND_TITLE" => "Legend",
+    "VIEWER_LEGEND_CHANNELS" => "Channels",
+    "VIEWER_LEGEND_PEOPLE" => "People",
+    "VIEWER_LEGEND_SOUND_OFF" => "Sound off",
+    "VIEWER_LEGEND_MIC_OFF" => "Microphone off",
+    "VIEWER_LEGEND_TIP" => "Click a channel to join it, or a person to see their details.",
+    "VIEWER_CONNECT_CHANNEL" => "Connect to “{0}”?",
+    "VIEWER_CONNECT_SERVER" => "Connect to the server?",
+    "VIEWER_CONNECT_TEXT" => "TeamSpeak will open and connect to {0}.",
+    "VIEWER_CONNECT_PASSWORD_NOTE" => "The channel is password-protected, TeamSpeak will ask for the password.",
+    "VIEWER_CONNECT_FULL_NOTE" => "The channel is full right now.",
+    "VIEWER_CONNECT_EMPTY" => "Nobody is in the channel right now.",
+    "VIEWER_CONNECT_HIDDEN" => "This channel does not show who is in it.",
+    "VIEWER_CONNECT_CANCEL" => "Cancel",
+    "VIEWER_CLIENT_INFO_ERROR" => "Could not load the details. Try again in a moment.",
+    "VIEWER_UNAVAILABLE_TITLE" => "The channel list is unavailable",
+    "VIEWER_UNAVAILABLE_TEXT" => "It will be back as soon as the TeamSpeak server responds.",
+    "VIEWER_RETRY" => "Reload",
+];

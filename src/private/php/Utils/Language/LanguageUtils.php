@@ -18,6 +18,7 @@ class LanguageUtils {
 
     private $cache;
     private $languages;
+    private $bundled = [];
 
     private function __construct() {
         $this->cache = new PhpFileCache(__CACHE_DIR, "translations");
@@ -155,7 +156,8 @@ class LanguageUtils {
             $englishname = $lang["englishname"];
             $nativename = $lang["nativename"];
             $langcode = $lang["langcode"];
-            $isdefault = $lang["isdefault"] === "1";
+            // PDO returns native integers on PHP 8.1+ and strings before that
+            $isdefault = (int) $lang["isdefault"] === 1;
 
             $strings = $db->select("translations", [
                 "identifier",
@@ -219,17 +221,30 @@ class LanguageUtils {
             throw new \Exception("Cannot get user or default language");
         }
 
-        $item = $lang->getLanguageItem($identifier);
+        $val = null;
 
-        if(!$item) {
-            $item = $defaultlang->getLanguageItem($identifier);
+        // Database strings always win. Bundled strings only fill in identifiers that
+        // an existing installation's database does not have yet (added in newer versions)
+        foreach ([$lang, $defaultlang] as $language) {
+            if ($language === null) {
+                continue;
+            }
+
+            $item = $language->getLanguageItem($identifier);
+            $val = $item ? $item->getValue() : $this->getBundledTranslation($language->getLanguageCode(), $identifier);
+
+            if ($val !== null) {
+                break;
+            }
         }
 
-        if(!$item) {
+        if ($val === null) {
+            $val = $this->getBundledTranslation("en", $identifier);
+        }
+
+        if ($val === null) {
             throw new \Exception("Cannot get translation for $identifier");
         }
-
-        $val = $item->getValue();
 
         // Replace placeholders with values from $args
         foreach ($args as $i => $iValue) {
@@ -240,6 +255,32 @@ class LanguageUtils {
         }
 
         return $val;
+    }
+
+    /**
+     * Looks up a string shipped with the website in bundled/<language code>/*.php.
+     * "pt-BR" falls back to "pt" when there is no dedicated directory.
+     * @return string|null translated text, null if not bundled
+     */
+    private function getBundledTranslation(string $languageCode, string $identifier): ?string {
+        $languageCode = strtolower($languageCode);
+        $candidates = [$languageCode, explode("-", $languageCode)[0]];
+
+        foreach (array_unique($candidates) as $code) {
+            if (!array_key_exists($code, $this->bundled)) {
+                $this->bundled[$code] = [];
+
+                foreach (glob(__DIR__ . "/bundled/" . basename($code) . "/*.php") ?: [] as $file) {
+                    $this->bundled[$code] += require $file;
+                }
+            }
+
+            if (isset($this->bundled[$code][$identifier])) {
+                return $this->bundled[$code][$identifier];
+            }
+        }
+
+        return null;
     }
 
 }

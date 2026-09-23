@@ -39,6 +39,56 @@ class TemplateUtils {
         $this->getLatte()->addFilter("translate", function ($s, ...$args) {
             return new Html(__get($s, $args));
         });
+
+        // Status labels like "Uptime:" are stored with a trailing colon, the layout adds its own separation
+        $this->getLatte()->addFilter("label", function ($s) {
+            return new Html(preg_replace('/(\s|&nbsp;|\xC2\xA0)*:(\s|&nbsp;|\xC2\xA0)*$/u', "", (string) $s));
+        });
+
+        $this->getLatte()->addFunction("icon", function (string $name, string $class = "") {
+            return new Html(self::icon($name, $class));
+        });
+
+        $this->getLatte()->addFunction("avatar", function (string $nickname, string $class = "") {
+            return new Html(self::avatar($nickname, $class));
+        });
+    }
+
+    /**
+     * Monogram avatar for a TeamSpeak nickname. TeamSpeak avatars are not reachable
+     * over WebQuery, so every person gets their first letter on a hue derived from the name:
+     * the same person always looks the same, different people rarely collide.
+     */
+    public static function avatar(string $nickname, string $class = ""): string {
+        $letter = "?";
+
+        if (preg_match('/[\p{L}\p{N}]/u', $nickname, $match)) {
+            $letter = mb_strtoupper($match[0]);
+        }
+
+        $hue = crc32(mb_strtolower($nickname)) % 360;
+        $classes = trim("avatar $class");
+
+        return '<span class="' . Utils::escape($classes) . '" style="--h: ' . $hue . '" aria-hidden="true">' . Utils::escape($letter) . '</span>';
+    }
+
+    /**
+     * Returns an inline SVG that references a symbol from img/icons.svg (Phosphor icons)
+     * @param string $name icon name without the "i-" prefix, for example "copy"
+     * @param string $class additional CSS classes
+     * @param string $basePath path to the website root, relative to the current page
+     */
+    public static function icon(string $name, string $class = "", string $basePath = ""): string {
+        static $version = null;
+
+        if ($version === null) {
+            $version = (int) @filemtime(__BASE_DIR . "/img/icons.svg");
+        }
+
+        $classes = trim("i $class");
+        $href = $basePath . "img/icons.svg?v=$version#i-" . rawurlencode($name);
+
+        return '<svg class="' . Utils::escape($classes) . '" aria-hidden="true" focusable="false"><use href="' . Utils::escape($href) . '"></use></svg>';
     }
 
     /**
@@ -64,7 +114,7 @@ class TemplateUtils {
      * @param string $errorname Error title
      * @param string $description Error description
      */
-    public function renderErrorTemplate(string $errorcode = null, string $errorname = "Error", string $description = null): void {
+    public function renderErrorTemplate(?string $errorcode = null, string $errorname = "Error", ?string $description = null): void {
         $data = [
             "errorcode" => $errorcode,
             "errorname" => $errorname,
@@ -111,12 +161,18 @@ class TemplateUtils {
             $data["sqlCount"] = @$dbutils->getDb()->query("SHOW SESSION STATUS LIKE 'Questions'")->fetchColumn(1);
 
             if (Config::get("adminstatus_enabled")) {
-                $data["adminStatus"] = AdminStatus::i()->getStatus(
-                    Config::get("adminstatus_groups"),
-                    Config::get("adminstatus_mode"),
-                    Config::get("adminstatus_hideoffline"),
-                    Config::get("adminstatus_ignoredusers")
-                );
+                // The status is cached in a file that another request may be rewriting at this moment;
+                // a failed read shows the admin status error instead of taking the whole page down
+                try {
+                    $data["adminStatus"] = AdminStatus::i()->getStatus(
+                        Config::get("adminstatus_groups"),
+                        Config::get("adminstatus_mode"),
+                        Config::get("adminstatus_hideoffline"),
+                        Config::get("adminstatus_ignoredusers")
+                    );
+                } catch (\Exception $e) {
+                    $data["adminStatus"] = false;
+                }
             }
         }
 

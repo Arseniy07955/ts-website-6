@@ -1,87 +1,195 @@
-<!-- Login modal -->
-<div class="modal fade" id="loginModal" tabindex="-1" role="dialog" aria-labelledby="loginModalLabel" aria-hidden="true">
+{* TeamSpeak login. One modal, one step visible at a time; js/login.js switches the steps *}
+{var $utils = Wruczek\TSWebsite\Utils\Utils::class}
+{* How long a code stays valid (cache_logincode, seconds) and how it reaches the client (loginpokeclient) *}
+{var $codeLifetime = (int) ($config["cache_logincode"] ?? 0)}
+{var $codeByPoke = (bool) ($config["loginpokeclient"] ?? true)}
+<div class="modal fade login-modal" id="loginModal" tabindex="-1" role="dialog" aria-labelledby="loginModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="loginModalLabel"><i class="fas fa-sign-in-alt"></i>Login</h5>
+                <h2 class="modal-title" id="loginModalLabel">{_"LOGIN_TITLE"}</h2>
 
                 <button type="button" class="close" data-dismiss="modal" aria-label="{_"ARIA_CLOSE"}">
-                    <span aria-hidden="true">&times;</span>
+                    {icon("x")}
                 </button>
             </div>
-            <div class="modal-body">
 
-                <!-- Error loading data alert -->
-                <div class="error-generic alert alert-danger" role="alert" style="display: none">
-                    <i class="fas fa-exclamation-circle"></i>
-                    Error loading login data. Is the server offline?
+            {* Where the visitor is in the flow. js/login.js marks the steps and moves the marker *}
+            <div class="login-progress">
+                <ol class="login-progress-list" aria-label="{_"LOGIN_PROGRESS"}">
+                    <li class="login-progress-step is-current" aria-current="step">
+                        <span class="login-progress-icon" aria-hidden="true">
+                            {icon("plugs-connected", "is-glyph")}{icon("check", "is-check")}{icon("warning-circle", "is-warn")}
+                        </span>
+                        <span class="login-progress-label">{_"LOGIN_STEP_CONNECT"}</span>
+                        <span class="sr-only login-progress-done">{_"LOGIN_STEP_DONE"}</span>
+                    </li>
+                    <li class="login-progress-step">
+                        <span class="login-progress-icon" aria-hidden="true">
+                            {icon("user-circle", "is-glyph")}{icon("check", "is-check")}{icon("warning-circle", "is-warn")}
+                        </span>
+                        <span class="login-progress-label">{_"LOGIN_STEP_ACCOUNT"}</span>
+                        <span class="sr-only login-progress-done">{_"LOGIN_STEP_DONE"}</span>
+                    </li>
+                    <li class="login-progress-step">
+                        <span class="login-progress-icon" aria-hidden="true">
+                            {icon("key", "is-glyph")}{icon("check", "is-check")}{icon("warning-circle", "is-warn")}
+                        </span>
+                        <span class="login-progress-label">{_"LOGIN_STEP_CODE"}</span>
+                        <span class="sr-only login-progress-done">{_"LOGIN_STEP_DONE"}</span>
+                    </li>
+                </ol>
+                <span class="login-progress-marker" aria-hidden="true"></span>
+            </div>
+
+            <div class="modal-body login-stage">
+
+                <!-- Loading: shaped like the steps that follow -->
+                <div class="login-step login-loading" data-step="loading" role="status">
+                    <span class="sr-only">{_"LOGIN_LOADING"}</span>
+                    <span class="skeleton login-skeleton-title" aria-hidden="true"></span>
+                    <span class="skeleton login-skeleton-line" aria-hidden="true"></span>
+                    <span class="skeleton login-skeleton-line is-short" aria-hidden="true"></span>
+                    <span class="skeleton login-skeleton-action" aria-hidden="true"></span>
+                    <span class="login-foot login-skeleton-foot" aria-hidden="true"><span class="skeleton"></span></span>
                 </div>
 
-                <!-- Error sending code alert -->
-                <div class="error-sendingcode alert alert-danger" role="alert" style="display: none">
-                    <i class="fas fa-exclamation-circle"></i>
-                    Error sending you the code. Are you online? Does the bot have permissions to poke you?
+                <!-- Errors: loading the client list, or sending the code -->
+                <div class="login-step login-error" data-step="error" hidden>
+                    <div class="error-generic alert alert-danger has-icon" role="alert" hidden>
+                        {icon("warning-circle", "alert-icon")}
+                        {_"LOGIN_ERROR_LOAD"}
+                    </div>
+
+                    <div class="error-sendingcode alert alert-danger has-icon" role="alert" hidden>
+                        {icon("warning-circle", "alert-icon")}
+                        {_"LOGIN_ERROR_SEND"}
+                    </div>
+
+                    <button type="button" class="btn btn-secondary" data-login-retry data-login-focus>
+                        {icon("arrow-clockwise")}{_"LOGIN_RETRY"}
+                    </button>
                 </div>
 
-                <!-- Loader -->
-                <div class="status-loader position-relative p-3">
-                    <div class="loader"></div>
-                </div>
+                <!-- Not connected to the server: polls every 2 seconds until the visitor shows up -->
+                <div class="login-step not-connected" data-step="not-connected" role="group" aria-labelledby="loginModal-nc-title" hidden>
+                    <h3 class="login-step-title" id="loginModal-nc-title">{_"LOGIN_NOT_CONNECTED"}</h3>
+                    <p class="login-step-text">{_"LOGIN_NOT_CONNECTED_TEXT"}</p>
 
-                <!-- Not connected to the server message -->
-                <div class="not-connected text-center" style="display: none">
-                    <h3>Not connected</h3>
-                    <p>Connect to <a href="ts3server://{$config["query_displayip"]|escapeUrl}">{$config["query_displayip"]}</a> and wait ±30 seconds.<br>The website will auto-refresh.</p>
-                    <a href="ts3server://{$config["query_displayip"]|escapeUrl}" class="btn btn-primary">
-                        <i class="fas fa-sign-in-alt"></i>Connect
-                    </a>
+                    <div class="login-connect">
+                        <a class="btn btn-primary" href="ts3server://{$config["query_displayip"]|escapeUrl}" data-login-focus>
+                            {_"CONNECT_BUTTON"}{icon("arrow-right", "i-arrow")}
+                        </a>
 
-                    <p class="mb-3 mt-3 waiting-connect">
-                        <i class="fas fa-sync fa-spin"></i>Waiting for you to connect
-                    </p>
-
-                    <!-- <p class="mb-0">Still not working? Try <a href="#">other login methods</a></p> -->
-
-                    <!-- Show a small IP debug -->
-                    {var $utils = Wruczek\TSWebsite\Utils\Utils::class}
-                    <span class="loginDebugInfo"
-                          data-toggle="tooltip"
-                          data-html="true" title="Debug info: Your IP<br>Raw: {$utils::getClientIp(false)}<br>CF: {$utils::getClientIp(true)}">
-                        &pi;
-                    </span>
-                </div>
-
-                <!-- Account selector, if we have more than 2 accounts on the same IP address -->
-                <div class="select-account text-center" style="display: none">
-                    <h3 class="mb-3">Select your account</h3>
-
-                    <script id="select-account-template" type="text/template">
-                        <button type="button" class="list-group-item list-group-item-action" data-selectaccount="[1]">
-                            [0]<span class="badge badge-secondary badge-pill">ID [1]</span>
+                        <button type="button" class="address" data-copy="{$config["query_displayip"]}" aria-label="{_"COPY_ADDRESS"}: {$config["query_displayip"]}">
+                            <span>{$config["query_displayip"]}</span>
+                            {icon("copy")}
+                            <span class="address-feedback" aria-live="polite">{_"COPIED"}</span>
                         </button>
-                    </script>
+                    </div>
 
-                    <div class="list-group">
-                        Loading...
+                    <div class="login-foot login-waiting">
+                        <p class="waiting-connect">
+                            <span class="live-dot login-waiting-dot" aria-hidden="true"></span>{_"LOGIN_WAITING"}
+                        </p>
+
+                        {* Small IP debug, helps when the website and TeamSpeak see different addresses *}
+                        <span class="loginDebugInfo"
+                              tabindex="0"
+                              data-toggle="tooltip"
+                              data-placement="left"
+                              data-html="true"
+                              title="{_"LOGIN_DEBUG_IP"}<br>Raw: {$utils::getClientIp(false)}<br>CF: {$utils::getClientIp(true)}">&pi;</span>
                     </div>
                 </div>
 
-                <!-- Confirmation code form -->
-                <div class="confirmation-code text-center" style="display: none">
-                    <h3>Enter your code</h3>
-                    <p>We have send a confirmation code to <b class="selected-nickname"></b>.</p>
+                <!-- Account selector, when more than one client is connected from the visitor's IP -->
+                <div class="login-step select-account" data-step="select-account" role="group" aria-labelledby="loginModal-sa-title" hidden>
+                    <h3 class="login-step-title" id="loginModal-sa-title">{_"LOGIN_SELECT_ACCOUNT"}</h3>
+                    <p class="login-step-text">{_"LOGIN_SELECT_ACCOUNT_TEXT"}</p>
 
-                    <form id="loginModal-codeconfirm">
-                        <div class="input-group">
-                            <input type="number" class="form-control" placeholder="Confirmation code">
-                            <div class="input-group-append">
-                                <button class="btn btn-secondary">Send</button>
+                    {* [0] nickname and [1] client database id (escaped by js/login.js), [2] monogram avatar *}
+                    <template id="select-account-template">
+                        <li>
+                            <button type="button" class="login-account" data-selectaccount="[1]">
+                                [2]
+                                <span class="login-account-text">
+                                    <span class="login-account-name">[0]</span>
+                                    <span class="login-account-id">{_"LOGIN_ACCOUNT_ID", "[1]"}</span>
+                                </span>
+                                <span class="login-account-end" aria-hidden="true">
+                                    {icon("arrow-right", "login-account-arrow")}
+                                    <span class="login-spinner"></span>
+                                </span>
+                            </button>
+                        </li>
+                    </template>
+
+                    <ul class="login-accounts"></ul>
+                </div>
+
+                <!-- Confirmation code form -->
+                <div class="login-step confirmation-code" data-step="confirmation-code" role="group" aria-labelledby="loginModal-cc-title" hidden>
+                    <h3 class="login-step-title" id="loginModal-cc-title">{_"LOGIN_ENTER_CODE"}</h3>
+                    <p class="login-step-text" id="loginModal-code-sent">{if $codeByPoke}{_"LOGIN_CODE_SENT_POKE"}{else}{_"LOGIN_CODE_SENT_MESSAGE"}{/if}</p>
+
+                    <form id="loginModal-codeconfirm" class="login-code-form" novalidate>
+                        <label class="sr-only" for="loginModal-code">{_"LOGIN_CODE_LABEL"}</label>
+
+                        <div class="login-code-row">
+                            {* One real input for typing, paste and one-time-code autofill; the boxes behind it are drawing only *}
+                            <div class="login-code-field">
+                                <span class="login-code-slots" aria-hidden="true">
+                                    <span class="login-code-slot"></span><span class="login-code-slot"></span><span class="login-code-slot"></span><span class="login-code-slot"></span><span class="login-code-slot"></span><span class="login-code-slot"></span>
+                                </span>
+
+                                <input type="text" class="login-code-input" id="loginModal-code" name="code"
+                                       inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*"
+                                       spellcheck="false" autocapitalize="off"
+                                       aria-describedby="loginModal-code-sent loginModal-code-life" data-login-focus>
                             </div>
-                            <div class="invalid-feedback">
-                                Invalid confirmation code, try again.
+
+                            {* One line under the boxes, so a wrong code does not move the modal: the rule for codes,
+                               or the error with a way to get a new code, or the answer to that. js/login.js switches them *}
+                            <div class="login-code-meta">
+                                <p class="login-code-life" id="loginModal-code-life">
+                                    {if $codeLifetime > 0}
+                                        {icon("timer", "i-sm")}{_"LOGIN_CODE_VALID", ($codeLifetime % 60 === 0 ? __get("LOGIN_DURATION_MIN", [intdiv($codeLifetime, 60)]) : __get("LOGIN_DURATION_SEC", [$codeLifetime]))}
+                                    {/if}
+                                </p>
+                                <p class="invalid-feedback" id="loginModal-code-error" role="alert" hidden>{icon("warning-circle", "i-sm")}{_"LOGIN_CODE_INVALID"}</p>
+
+                                {* Asks for the code again: a new one once the last has expired, otherwise the note says the last one still works *}
+                                <button type="button" class="btn-reset block-link login-resend" data-login-resend hidden>
+                                    <span class="login-resend-label">{_"LOGIN_CODE_RESEND"}</span>
+                                    <span class="login-spinner" aria-hidden="true"></span>
+                                </button>
+
+                                {* A live region that stays in place and starts empty, so the answer is read out *}
+                                <p class="login-code-note" id="loginModal-code-note" role="status"
+                                   data-sent="{_"LOGIN_CODE_RESENT"}" data-still-valid="{_"LOGIN_CODE_STILL_VALID"}"></p>
                             </div>
+
+                            <button type="submit" class="btn btn-primary login-code-submit">
+                                <span class="login-spinner" aria-hidden="true"></span>
+                                <span class="login-code-submit-label">{_"LOGIN_SUBMIT"}</span>
+                            </button>
                         </div>
+
                     </form>
+
+                    {* The account the code went to. "Other account" only when there was a choice *}
+                    <div class="login-foot login-who">
+                        <span class="login-who-avatar"></span>
+                        <span class="login-who-text">
+                            <span class="login-who-name selected-nickname"></span>
+                            <span class="login-who-id">{_"LOGIN_ACCOUNT_ID", '<span class="login-who-cldbid"></span>'}</span>
+                        </span>
+
+                        <button type="button" class="btn-reset block-link login-back" data-login-back hidden>
+                            {icon("arrow-left")}{_"LOGIN_OTHER_ACCOUNT"}
+                        </button>
+                    </div>
                 </div>
 
             </div>

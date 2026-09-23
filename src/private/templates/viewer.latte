@@ -1,51 +1,227 @@
 {extends "body.latte"}
 {var $title = __get("VIEWER_TITLE")}
 {var $navActiveIndex = 1}
+{var $flushPage = true}
 
 {block content}
-<div class="card card-accent">
-    <div class="card-header bigger-title d-flex justify-content-between align-items-center">
-        <span>
-            <i class="fas fa-eye"></i>{_"VIEWER_PANEL_TITLE"}
-        </span>
-        <span>
-            <button type="button" class="btn btn-primary btn-sm" data-emptychannels="hide" data-toggle="tooltip" title="{_"VIEWER_HIDE_EMPTY"}">
-                <i class="far fa-eye mr-0"></i>
-            </button>
-            <button type="button" class="btn btn-primary btn-sm" data-emptychannels="show" style="display: none" data-toggle="tooltip" title="{_"VIEWER_SHOW_EMPTY"}">
-                <i class="far fa-eye-slash mr-0"></i>
-            </button>
-        </span>
-    </div>
-    <div class="card-body">
-        {if $html === null}
-            {include "utils/data-problem.latte", message => __get("CANNOT_GET_DATA", "viewer")}
-        {else}
-            <div id="server-viewer-tip" class="alert alert-info alert-dismissible fade show" style="display: none" role="alert">
-                <i class="fas fa-info-circle"></i>{_"VIEWER_TIP_ALERT"}
-                <button type="button" class="close" data-dismiss="alert" aria-label="{_"ARIA_CLOSE"}">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+<header class="section page-hero viewer-hero reveal">
+    <h1 class="page-title">{_"VIEWER_PANEL_TITLE"}</h1>
+    <p class="page-sub">{_"VIEWER_PAGE_SUB"}</p>
+</header>
+
+{if $html === null}
+    {* The server data could not be loaded. The first failing request also has the connection alert
+       with the error list above (body.latte); the ones after it read the failure from the cache and
+       have no alert, so this calm state has to stand on its own either way *}
+    <section class="section viewer-unavailable reveal" style="--i: 1">
+        <div class="empty-state">
+            {icon("tree-view")}
+            <p class="empty-state-title">{_"VIEWER_UNAVAILABLE_TITLE"}</p>
+            <p>{_"VIEWER_UNAVAILABLE_TEXT"}</p>
+            <a class="btn btn-secondary" href="viewer.php">{icon("arrow-clockwise")}{_"VIEWER_RETRY"}</a>
+        </div>
+    </section>
+{else}
+    {* Server numbers come from the cache and are kept live by js/status.js (data-status hooks);
+       the channel numbers describe the tree below, so they stay as rendered *}
+    <section class="stat-strip viewer-facts reveal" style="--i: 1" data-server-status data-state="loading" aria-label="{_"STATUS_PANEL_TITLE"}">
+        <dl class="cells">
+            <div class="cell">
+                <dt>{icon("broadcast", "i-sm")}{_"VIEWER_FACT_SERVER"}</dt>
+                <dd class="viewer-fact-state">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <span class="when-loading">{_"VIEWER_STATE_LOADING"}</span>
+                    <span class="when-online">{_"VIEWER_STATE_ONLINE"}</span>
+                    <span class="when-offline">{_"VIEWER_STATE_OFFLINE"}</span>
+                </dd>
+                {* The version carries its platform icon and a "6.0.0 on Linux" tooltip (js/status.js) *}
+                <dd class="cell-sub viewer-fact-sub" data-status="version" data-toggle="tooltip" data-translation="{_"STATUS_VERSION_DESC"}">{$facts["version"]}</dd>
             </div>
 
-            <div class="viewer-container">
+            <div class="cell">
+                <dt>{icon("users", "i-sm")}{_"STATUS_CLIENTS_ONLINE"|label}</dt>
+                <dd>
+                    <span class="viewer-fact-value">
+                        {* role="img" gives the rolling digits (aria-hidden) the name status.js sets *}
+                        <span class="viewer-fact-count when-online-or-loading" data-status-count role="img"><span class="skeleton"></span></span>
+                        <span class="when-offline" n:if="$facts['online'] !== null">{$facts["online"]}</span>
+                        <span class="viewer-fact-of" n:if="$facts['maxClients'] !== null" aria-hidden="true">/ <span data-status="maxClients">{$facts["maxClients"]}</span></span>
+                    </span>
+                </dd>
+                <dd class="cell-sub viewer-fact-sub">
+                    {_"STATUS_TOP_ONLINE"|label}: <span class="tabular" data-status="onlineRecord" data-toggle="tooltip" data-translation="{_"STATUS_TOP_ONLINE_DESC"}">{$facts["onlineRecord"]}</span>
+                </dd>
+            </div>
+
+            <div class="cell">
+                <dt>{icon("tree-view", "i-sm")}{_"HOME_BUSY_CHANNELS"}</dt>
+                <dd>
+                    <span class="viewer-fact-value">
+                        {$facts["occupied"]}<span class="viewer-fact-of">/ <span data-status="channelCount">{$facts["channelCount"]}</span></span>
+                    </span>
+                </dd>
+            </div>
+
+            <div class="cell">
+                <dt>{icon("users-three", "i-sm")}{_"VIEWER_FACT_BUSIEST"}</dt>
+                {if $facts["busiest"]}
+                    <dd><span class="viewer-fact-text" title="{$facts["busiest"]["name"]}">{$facts["busiest"]["name"]}</span></dd>
+                    <dd class="cell-sub viewer-fact-sub">{_"VIEWER_IN_CHANNEL", count($facts["busiest"]["clients"])}</dd>
+                {else}
+                    <dd class="viewer-fact-none">{_"VIEWER_FACT_NOBODY"}</dd>
+                {/if}
+            </div>
+        </dl>
+    </section>
+
+    <div class="split viewer-split">
+        {* The side column comes first, so the search and the switch are the first stops for Tab and
+           come before the tree they filter; css/pages/viewer.css puts the column on the right. A plain
+           div: on narrow screens it steps aside (display: contents), the search sits above the tree
+           and the legend below it (the legend has nothing to focus, so the order stays true) *}
+        <div class="split-side viewer-side">
+            <div class="viewer-side-inner">
+                <section class="side-block viewer-tools reveal" style="--i: 3" role="search" aria-labelledby="viewer-search-title">
+                    <div class="side-head">
+                        <h2 class="side-title" id="viewer-search-title">{_"VIEWER_SEARCH_TITLE"}</h2>
+                        <p class="viewer-search-status" data-search-status aria-live="polite"></p>
+                    </div>
+
+                    <div class="viewer-search">
+                        <label class="sr-only" for="viewer-search">{_"VIEWER_SEARCH_LABEL"}</label>
+                        {icon("magnifying-glass", "viewer-search-icon")}
+                        <input type="search" class="form-control" id="viewer-search" aria-controls="viewer-tree"
+                               placeholder="{_"VIEWER_SEARCH_LABEL"}" autocomplete="off" spellcheck="false" enterkeyhint="search">
+                        <button type="button" class="btn-reset viewer-search-clear" aria-label="{_"VIEWER_SEARCH_CLEAR"}" hidden>{icon("x")}</button>
+                    </div>
+
+                    <button type="button" class="viewer-switch" role="switch" aria-checked="false" data-hide-empty>
+                        <span class="viewer-switch-track" aria-hidden="true"></span>
+                        <span>{_"VIEWER_HIDE_EMPTY"}</span>
+                    </button>
+                    <script>
+                        // Show the saved choice before the first paint; the tree below applies it the same way
+                        try {
+                            if (localStorage.getItem("tswebsite_viewer_hide_empty") === "1") {
+                                document.querySelector("[data-hide-empty]").setAttribute("aria-checked", "true")
+                            }
+                        } catch (e) {}
+                    </script>
+                </section>
+
+                <section class="side-block viewer-legend reveal" style="--i: 4" aria-labelledby="viewer-legend-title" n:if="$legend">
+                    <div class="side-head">
+                        <h2 class="side-title" id="viewer-legend-title">{_"VIEWER_LEGEND_TITLE"}</h2>
+                    </div>
+
+                    <div class="viewer-legend-group" n:foreach="$legend as $group => $items">
+                        <h3 class="viewer-legend-group-name">{$group === "channels" ? __get("VIEWER_LEGEND_CHANNELS") : __get("VIEWER_LEGEND_PEOPLE")}</h3>
+                        <ul class="viewer-legend-list">
+                            <li n:foreach="$items as $item">
+                                <span class="viewer-legend-icon" aria-hidden="true">{icon($item["icon"])}</span>
+                                <span class="viewer-legend-labels">
+                                    <span n:foreach="$item['labels'] as $label">{$label}</span>
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <p class="side-note viewer-tip">{_"VIEWER_LEGEND_TIP"}</p>
+                </section>
+            </div>
+        </div>
+
+        <section class="split-main viewer-main reveal" style="--i: 2" aria-label="{_"VIEWER_PANEL_TITLE"}">
+            {* The tree comes from ViewerRenderer.php; css/pages/viewer.css and js/viewer.js give it life *}
+            <div class="viewer-container" id="viewer-tree">
+                <script>
+                    // Apply the saved "hide empty channels" choice before the tree is painted
+                    try {
+                        if (localStorage.getItem("tswebsite_viewer_hide_empty") === "1") {
+                            document.getElementById("viewer-tree").classList.add("hide-empty")
+                        }
+                    } catch (e) {}
+                </script>
+
                 {$html|noescape}
             </div>
-        {/if}
+
+            {* Shown by js/viewer.js when the search matches nothing that is on screen *}
+            <div class="empty-state viewer-no-results" data-search-empty hidden>
+                {icon("magnifying-glass")}
+                <p class="empty-state-title">{_"VIEWER_SEARCH_EMPTY"}</p>
+                <p data-search-empty-text></p>
+                <p class="viewer-no-results-hidden" data-search-empty-hidden hidden>{_"VIEWER_SEARCH_EMPTY_HIDDEN"}</p>
+                <div class="viewer-no-results-actions">
+                    <button type="button" class="btn btn-secondary" data-search-reset>{icon("x")}{_"VIEWER_SEARCH_RESET"}</button>
+                    <button type="button" class="btn btn-ghost" data-search-show-empty hidden>{icon("eye")}{_"VIEWER_SHOW_EMPTY"}</button>
+                </div>
+            </div>
+        </section>
     </div>
-</div>
+
+    <div class="modal fade viewer-connect" id="viewer-connect" tabindex="-1" role="dialog" aria-labelledby="viewer-connect-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="viewer-connect-head">
+                        <p class="viewer-connect-path" data-connect-path hidden></p>
+                        <h2 class="modal-title" id="viewer-connect-title" data-connect-title></h2>
+                        <p class="viewer-connect-topic" data-connect-topic hidden></p>
+                    </div>
+                </div>
+
+                <div class="modal-body">
+                    {* Who is in the channel right now, copied from the tree by js/viewer.js *}
+                    <div class="viewer-connect-people">
+                        <p class="viewer-connect-count" data-connect-count></p>
+                        <div class="viewer-connect-crowd" data-connect-crowd>
+                            <span class="avatar-stack" data-connect-avatars aria-hidden="true"></span>
+                            <p class="viewer-connect-names" data-connect-names></p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning has-icon viewer-connect-alert" data-connect-note="full" hidden>
+                        {icon("prohibit", "alert-icon")}{_"VIEWER_CONNECT_FULL_NOTE"}
+                    </div>
+
+                    <div class="alert has-icon viewer-connect-alert" data-connect-note="password" hidden>
+                        {icon("lock-simple", "alert-icon")}{_"VIEWER_CONNECT_PASSWORD_NOTE"}
+                    </div>
+
+                    <p class="viewer-connect-text">
+                        {_"VIEWER_CONNECT_TEXT", '<span class="viewer-connect-address">' . $utils::escape($config["query_displayip"]) . '</span>'}
+                    </p>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">{_"VIEWER_CONNECT_CANCEL"}</button>
+                    <a class="btn btn-primary" href="ts3server://{$config["query_displayip"]|escapeUrl}" data-connect-link>
+                        {_"CONNECT_BUTTON"}{icon("arrow-right", "i-arrow")}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{/if}
 {/block}
 
 {block footerbottom}
     <script>
         var TS3_DISPLAY_IP = {$config["query_displayip"]}
         var VIEWER_LANG = {
-            connection_alert: {_"VIEWER_CONNECTION_CONFIRMATION"},
-            client_info: {_"VIEWER_CLIENT_TITLE"},
-            last_active: {_"VIEWER_CLIENT_LASTACTIVE"},
-            online_time: {_"VIEWER_CLIENT_ONLINE"},
-            first_joined: {_"VIEWER_CLIENT_JOINED"},
-            viewer_error: {_"VIEWER_ERROR"}
+            connect_channel: {_"VIEWER_CONNECT_CHANNEL"},
+            connect_server: {_"VIEWER_CONNECT_SERVER"},
+            in_channel: {_"VIEWER_IN_CHANNEL"},
+            on_server: {_"VIEWER_ON_SERVER"},
+            connect_empty: {_"VIEWER_CONNECT_EMPTY"},
+            connect_hidden: {_"VIEWER_CONNECT_HIDDEN"},
+            search_matches: {_"VIEWER_SEARCH_MATCHES"},
+            search_empty_text: {_"VIEWER_SEARCH_EMPTY_TEXT"},
+            last_active: {_"VIEWER_CLIENT_LASTACTIVE"|label},
+            online_time: {_"VIEWER_CLIENT_ONLINE"|label},
+            first_joined: {_"VIEWER_CLIENT_JOINED"|label},
+            info_error: {_"VIEWER_CLIENT_INFO_ERROR"}
         }
     </script>
     {$tplutils::includeScript("js/viewer.js", true)}

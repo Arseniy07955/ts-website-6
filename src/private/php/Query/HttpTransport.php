@@ -245,7 +245,10 @@ class HttpTransport extends \TeamSpeak3_Transport_Abstract {
             ]);
             $response = curl_exec($ch);
             $error = curl_error($ch);
-            curl_close($ch);
+            // curl_close() is a no-op since PHP 8.0 and deprecated in 8.5, the handle is freed with $ch
+            if (PHP_VERSION_ID < 80000) {
+                curl_close($ch);
+            }
         } else {
             $context = stream_context_create([
                 "http" => [

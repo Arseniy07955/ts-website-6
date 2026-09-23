@@ -1,16 +1,20 @@
-<div class="alert alert-danger clearfix" role="alert">
-    <i class="fas fa-exclamation-circle"></i>{$message}
+{var $level = $level ?? "danger"}
+<div n:class="alert, has-icon, $level === 'warning' ? alert-warning : alert-danger" role="alert">
+    {icon($level === "warning" ? "clock" : "warning-circle", "alert-icon")}
+    <div>{$message}</div>
 
     {if $tsExceptions}
-        <a href="#" data-connectionproblem="trigger" class="float-right">
-            <i class="fas fa-bug" style="color: #000"></i>{_"SHOW_PROBLEMS"}
-        </a>
+        <button type="button" class="alert-link-button" data-connectionproblem="trigger">
+            {icon("bug", "i-sm")}{_"SHOW_PROBLEMS"}
+        </button>
 
         <div class="connectionproblems" data-connectionproblem="hidden" style="display: none">
-            {_"PROBLEMS_DESCRIPTION"}<br>
-            {foreach $tsExceptions as $e}
-                <li><code>#{$e->getCode()}: {$e->getMessage()}</code></li>
-            {/foreach}
+            {_"PROBLEMS_DESCRIPTION"}
+            <ul>
+                {foreach $tsExceptions as $e}
+                    <li><code>#{$e->getCode()}: {$e->getMessage()}</code></li>
+                {/foreach}
+            </ul>
         </div>
     {/if}
 </div>

@@ -5,6 +5,7 @@ use Medoo\Medoo;
 
 if (!empty($_POST)) {
     $dbhostname = trim($_POST["dbhostname"]);
+    $dbport = trim($_POST["dbport"] ?? "");
     $dbusername = trim($_POST["dbusername"]);
     $dbpassword = trim($_POST["dbpassword"]);
     $dbname = trim($_POST["dbname"]);
@@ -17,7 +18,13 @@ if (!empty($_POST)) {
         $dbprefix = "tsw_";
     }
 
-    if (!empty($dbhostname) && !empty($dbusername) && !empty($dbname)) {
+    if ($dbport === "") {
+        $dbport = "3306";
+    }
+
+    if (!preg_match("/^[0-9]{1,5}$/", $dbport) || (int) $dbport < 1 || (int) $dbport > 65535) {
+        $errormessage = "Please enter a port between 1 and 65535";
+    } else if (!empty($dbhostname) && !empty($dbusername) && !empty($dbname)) {
         $dbconfig = [
             "database_type" => "mysql",
             "server" => $dbhostname,
@@ -25,7 +32,7 @@ if (!empty($_POST)) {
             "password" => $dbpassword,
             "database_name" => $dbname,
             "prefix" => $dbprefix,
-            "port" => 3306,
+            "port" => (int) $dbport,
             "charset" => "utf8mb4"
         ];
     } else {
@@ -93,9 +100,10 @@ return [
 EOT;
             $confarray = "";
 
-            // Add all variables to the config
+            // Add all variables to the config. The values are single-quoted PHP strings, so only
+            // quotes and backslashes need escaping (a password with ' used to break the file)
             foreach ($dbconfig as $key => $value) {
-                $confarray .= sprintf("    '%s' => '%s'," . PHP_EOL, addcslashes($key, '"'), addcslashes($value, '"'));
+                $confarray .= sprintf("    '%s' => '%s'," . PHP_EOL, addcslashes($key, "'\\"), addcslashes($value, "'\\"));
             }
 
             // Remove semicolon and new line from the end
@@ -120,116 +128,143 @@ EOT;
             if($e->getCode() === 1049) {
                 $errormessage .= '<br>Please manually create database "' . htmlspecialchars($dbname) . '" and try again.';
             }
+
+            // PDO reports "Connection refused" with code 0, the MySQL client code is only in the message
+            if(strpos($e->getMessage(), "[2002]") !== false) {
+                $errormessage .= '<br>Check the host and the port, and that the database server is running.';
+            }
         }
     }
 
 }
+
+// Keep what was typed when the form comes back with an error (never the password)
+function dbField(string $name, string $default = ""): string {
+    return htmlspecialchars(isset($_POST[$name]) ? trim((string) $_POST[$name]) : $default);
+}
 ?>
 
-<?php if(!empty($errormessage)) { ?>
-<div class="text-center">
-    <div class="alert alert-danger" style="display: inline-block">
-        <?= $errormessage ?>
-    </div>
-</div>
-<?php } ?>
+<header class="installer-head reveal">
+    <?= $stepChip ?>
+    <h1 class="page-title">Database</h1>
+    <p class="page-sub">TS-website keeps its settings, news and translations in a MySQL or MariaDB database.</p>
+</header>
 
-<div class="card">
+<div class="installer-body">
+    <?php if(!empty($errormessage)) { ?>
+        <div class="alert alert-danger has-icon reveal" style="--i: 1" role="alert">
+            <?= installerIcon("warning-circle", "alert-icon") ?>
+            <?= $errormessage ?>
+        </div>
+    <?php } ?>
 
-    <div class="card-body">
-        <h3 class="card-title text-center">Database details</h3>
+    <fieldset class="form-group reveal" style="--i: 1">
+        <legend class="sr-only">Database type</legend>
 
-        <div class="text-center mb-3">
-            <div class="custom-control custom-radio">
-                <input type="radio" id="use-mysql-db" name="dbselection" class="custom-control-input" checked>
-                <label class="custom-control-label" for="use-mysql-db">Use MySQL / MariaDB</label>
+        <div class="custom-control custom-radio">
+            <input type="radio" id="use-mysql-db" name="dbselection" class="custom-control-input" checked>
+            <label class="custom-control-label" for="use-mysql-db">MySQL or MariaDB</label>
+        </div>
+        <div class="custom-control custom-radio">
+            <input type="radio" id="use-sqlite-db" name="dbselection" class="custom-control-input" disabled>
+            <label class="custom-control-label" for="use-sqlite-db">SQLite <span class="text-muted">(not supported yet)</span></label>
+        </div>
+    </fieldset>
+
+    <form id="dbform" method="post" action="<?= "?step=$stepNumber" ?>" class="reveal" style="--i: 2" data-busy-form>
+        <div class="field-row">
+            <div class="form-group">
+                <label for="dbhostname">Host</label>
+                <input class="form-control" id="dbhostname" name="dbhostname" value="<?= dbField("dbhostname") ?>"
+                       placeholder="127.0.0.1" required autofocus autocomplete="off" spellcheck="false" aria-describedby="dbhostname-help">
+                <p class="form-text" id="dbhostname-help">Use <code>127.0.0.1</code> when the database runs on this server.</p>
             </div>
-            <div class="custom-control custom-radio">
-                <input type="radio" id="use-sqlite-db" name="dbselection" class="custom-control-input" disabled>
-                <label class="custom-control-label" for="use-sqlite-db">Use SQLite database</label>
+
+            <div class="form-group">
+                <label for="dbport">Port</label>
+                <input class="form-control" id="dbport" name="dbport" value="<?= dbField("dbport", "3306") ?>"
+                       inputmode="numeric" pattern="[0-9]{1,5}" required autocomplete="off">
             </div>
         </div>
 
-        <div class="row justify-content-md-center">
-            <form id="dbform" class="col-md-4" method="post" action="<?= "?step=$stepNumber" ?>"> <!-- style="display: none" novalidate -->
-
-                <div class="input-group mb-2">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text"><i class="fa fa-link fa-fw"></i></span>
-                    </div>
-                    <input class="form-control" name="dbhostname" placeholder="Hostname" required autofocus autocomplete="off">
-                    <div class="input-group-append">
-                        <span class="input-group-text" data-toggle="tooltip" title="Use '127.0.0.1' for localhost">
-                            <i class="fa fa-question-circle fa-fw"></i>
-                        </span>
-                    </div>
-                </div>
-
-                <div class="input-group mb-2">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text"><i class="fa fa-user fa-fw"></i></span>
-                    </div>
-                    <input class="form-control" name="dbusername" placeholder="Username" required autocomplete="off">
-                    <div class="input-group-append">
-                        <span class="input-group-text" data-toggle="tooltip" title="Its recommended to create seperate user account instead of using root">
-                            <i class="fa fa-exclamation-triangle color-danger fa-fw"></i>
-                        </span>
-                    </div>
-                </div>
-
-                <div class="input-group mb-2">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text"><i class="fa fa-lock fa-fw"></i></span>
-                    </div>
-                    <input type="password" class="form-control" name="dbpassword" placeholder="Password" autocomplete="off">
-                </div>
-
-                <div class="input-group mb-2">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text"><i class="fa fa-database fa-fw"></i></span>
-                    </div>
-                    <input class="form-control" name="dbname" placeholder="Database name" required autocomplete="off">
-                </div>
-
-                <div class="input-group mb-2">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text"><i class="fa fa-font fa-fw"></i></span>
-                    </div>
-                    <input class="form-control" name="dbprefix" placeholder="Table prefix (optional)" autocomplete="off">
-                    <div class="input-group-append">
-                        <span class="input-group-text" data-toggle="tooltip" title="Defaults to 'tsw_'">
-                            <i class="fa fa-question-circle fa-fw"></i>
-                        </span>
-                    </div>
-                </div>
-
-                <button id="submitform" type="submit" style="display: none"></button>
-            </form>
+        <div class="form-group">
+            <label for="dbusername">Username</label>
+            <input class="form-control" id="dbusername" name="dbusername" value="<?= dbField("dbusername") ?>"
+                   required autocomplete="off" spellcheck="false" aria-describedby="dbusername-help">
+            <p class="form-text" id="dbusername-help">A separate account for TS-website is safer than root.</p>
         </div>
+
+        <div class="form-group">
+            <label for="dbpassword">Password</label>
+            <input type="password" class="form-control" id="dbpassword" name="dbpassword" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+            <label for="dbname">Database name</label>
+            <input class="form-control" id="dbname" name="dbname" value="<?= dbField("dbname") ?>"
+                   required autocomplete="off" spellcheck="false" aria-describedby="dbname-help">
+            <p class="form-text" id="dbname-help">The database has to exist already. Its tables will be created now.</p>
+        </div>
+
+        <div class="form-group">
+            <label for="dbprefix">Table prefix <span class="text-muted">(optional)</span></label>
+            <input class="form-control" id="dbprefix" name="dbprefix" value="<?= dbField("dbprefix") ?>"
+                   placeholder="tsw_" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="installer-actions">
+            <a href="?step=<?= $stepNumber - 1 ?>" class="btn btn-ghost">
+                <?= installerIcon("arrow-left") ?>Back
+            </a>
+            <button type="submit" class="btn btn-primary">
+                Connect and continue<?= installerIcon("arrow-right", "i-arrow") ?><?= installerIcon("circle-notch", "i-busy") ?>
+            </button>
+        </div>
+    </form>
+</div>
+
+<?php ob_start(); ?>
+<section class="side-block reveal" style="--i: 1" aria-labelledby="notes-title">
+    <div class="side-head">
+        <h2 class="side-title" id="notes-title">When you continue</h2>
     </div>
 
-    <div class="card-footer text-right">
-        <a href="?step=<?= $stepNumber - 1 ?>" class="btn btn-primary float-left">
-            <i class="fas fa-chevron-left"></i> Back
-        </a>
-        <a href="#" id="submitformalt" class="btn btn-primary float-right">
-            Submit <i class="fas fa-chevron-right"></i>
-        </a>
-    </div>
-</div>
+    <ul class="howto">
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("database") ?></span>
+            <div>
+                <p class="howto-title">The tables are created</p>
+                <p class="howto-sub">config, faq, news, languages and translations, each with the table prefix in front</p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("warning-circle") ?></span>
+            <div>
+                <p class="howto-title">Tables with the same names are replaced</p>
+                <p class="howto-sub">An earlier install with this prefix loses its data. Pick another prefix to keep it</p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("floppy-disk") ?></span>
+            <div>
+                <p class="howto-title">The connection is saved on this server</p>
+                <p class="howto-sub"><code>private/dbconfig.php</code></p>
+            </div>
+        </li>
+    </ul>
+</section>
+<?php $pageNotes = ob_get_clean(); ?>
 
 <script>
-    $("#submitformalt").click(function () {
-        $("#submitform").click()
-    });
+    // The server may need a while to connect and create the tables: show it and block a second submit
+    $("[data-busy-form]").on("submit", function (e) {
+        var button = $(this).find('button[type="submit"]')
 
-    $("#use-mysql-db").change(function () {
-        $("#dbform").show()
-        $("#dbform").removeAttr("novalidate")
-    });
+        if (button.hasClass("is-busy")) {
+            e.preventDefault()
+            return
+        }
 
-    $("#use-sqlite-db").change(function () {
-        $("#dbform").hide()
-        $("#dbform").attr("novalidate", "")
-    });
+        button.addClass("is-busy").attr("aria-disabled", "true")
+    })
 </script>

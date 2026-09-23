@@ -24,7 +24,7 @@ interface INewsStore {
      * @return array array with the news
      * @throws \Exception when we cannot get the news
      */
-    public function getNewsList(int $limit, int $offset = null): array;
+    public function getNewsList(int $limit, ?int $offset = null): array;
 
     /**
      * Returns full information about this particular news
@@ -58,6 +58,6 @@ interface INewsStore {
      * @param int|null $editDate
      * @return bool true on success
      */
-    public function editNews(int $newsId, string $title = null, string $content = null, ?int $addDate = null, ?int $editDate = null): bool;
+    public function editNews(int $newsId, ?string $title = null, ?string $content = null, ?int $addDate = null, ?int $editDate = null): bool;
 
 }

@@ -1,0 +1,972 @@
+/* ==========================================================================
+   Channel viewer (viewer.php): a page head with live facts, then the channel tree
+   next to a side column with the search, "hide empty channels" and the legend.
+   Markup comes from private/templates/viewer.latte and private/php/ViewerRenderer.php,
+   behaviour from js/viewer.js. This file is loaded on every page, so everything stays
+   under viewer classes.
+   ========================================================================== */
+
+.viewer-hero .page-sub {
+    max-width: 640px;
+}
+
+/* ==========================================================================
+   Facts: the home page's cell row, four cells wide
+   ========================================================================== */
+
+@media (min-width: 901px) {
+    .viewer-facts .cells {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.viewer-facts .viewer-fact-state {
+    gap: 10px;
+}
+
+/* A number and its total on one line; the rolling digits (js/status.js) are boxes 1em tall
+   that would sit above the baseline, so the pair is centred instead */
+.viewer-fact-value {
+    display: inline-flex;
+    align-items: center;
+}
+
+.viewer-fact-count {
+    display: inline-flex;
+}
+
+.viewer-facts .viewer-fact-count .skeleton {
+    width: 40px;
+    height: 14px;
+}
+
+.viewer-fact-of {
+    margin-left: .3em;
+    color: var(--text-3);
+    white-space: nowrap;
+}
+
+.viewer-fact-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.viewer-facts .viewer-fact-none {
+    color: var(--text-3);
+}
+
+/* One line, cut with an ellipsis on a narrow cell */
+.viewer-facts .viewer-fact-sub {
+    display: block;
+    text-overflow: ellipsis;
+}
+
+/* The platform icon js/status.js puts after the version */
+.viewer-facts .viewer-fact-sub .i {
+    margin-left: 6px;
+    vertical-align: -.12em;
+}
+
+@media (max-width: 900px) {
+    /* Two by two: the home page's last cell spans the row, these four don't need to */
+    .viewer-facts .cell:last-child {
+        grid-column: auto;
+    }
+}
+
+/* A half-width cell cuts a channel name after a word or two, and touch has no title tooltip:
+   let the name take a second line instead */
+@media (max-width: 640px) {
+    .viewer-fact-text {
+        display: -webkit-box;
+        white-space: normal;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+}
+
+/* ==========================================================================
+   Layout: the tree, and the side column next to it
+   ========================================================================== */
+
+.viewer-main {
+    padding-top: 40px;
+}
+
+@media (min-width: 1001px) {
+    /* The side column comes first in the page (search before the tree for Tab), drawn on the right */
+    .viewer-split > .viewer-main {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .viewer-split > .viewer-side {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    /* The search stays at hand however far down the tree you are */
+    .viewer-side-inner {
+        position: sticky;
+        top: var(--header-h);
+        max-height: calc(100vh - var(--header-h));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+    }
+}
+
+/* One column: the search above the tree, the legend below it */
+@media (max-width: 1000px) {
+    .viewer-side,
+    .viewer-side-inner {
+        display: contents;
+    }
+
+    .viewer-tools {
+        order: -1;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .viewer-main {
+        order: 0;
+    }
+
+    .viewer-legend {
+        order: 1;
+    }
+
+    .viewer-split .viewer-tools {
+        padding-top: 32px;
+        padding-bottom: 32px;
+    }
+
+    /* A field as wide as a tablet is harder to read than to type into */
+    .viewer-tools > .side-head,
+    .viewer-search {
+        max-width: 560px;
+    }
+}
+
+/* ==========================================================================
+   Search
+   ========================================================================== */
+
+.viewer-search-status {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 13.5px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.viewer-search {
+    position: relative;
+}
+
+.viewer-search .form-control {
+    padding-left: 40px;
+    padding-right: 40px;
+}
+
+/* The field has its own clear button */
+.viewer-search .form-control::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.viewer-search-icon {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    color: var(--text-3);
+    pointer-events: none;
+    transition: color var(--dur-fast) ease;
+}
+
+.viewer-search:focus-within .viewer-search-icon {
+    color: var(--text);
+}
+
+.viewer-search-clear {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    margin-top: -16px;
+    border-radius: var(--radius-sm);
+    color: var(--text-3);
+    transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+
+.viewer-search-clear:hover {
+    background: var(--bg-2);
+    color: var(--text);
+}
+
+.viewer-search-clear .i {
+    width: 15px;
+    height: 15px;
+    vertical-align: 0;
+}
+
+/* Matches in the tree */
+.viewer-mark {
+    padding: 0;
+    border-radius: 2px;
+    background: var(--selection);
+    box-shadow: 0 0 0 2px var(--selection);
+    color: inherit;
+}
+
+.viewer-container.is-searching .is-filtered,
+.viewer-container.is-searching .viewer-note {
+    display: none;
+}
+
+/* Channels kept on screen only because something below them matches step back */
+.viewer-container.is-searching .is-context > .channel {
+    color: var(--text-3);
+}
+
+.viewer-no-results {
+    padding: 24px 0 8px;
+}
+
+.viewer-no-results p {
+    overflow-wrap: anywhere;
+}
+
+.viewer-no-results [data-search-empty-text] + .viewer-no-results-hidden {
+    margin-top: 6px;
+}
+
+.viewer-no-results-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.viewer-no-results-actions .btn {
+    margin: 0;
+}
+
+/* ==========================================================================
+   Hide-empty switch
+   ========================================================================== */
+
+.viewer-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    margin-top: 12px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-2);
+    font-size: 15px;
+    line-height: 1.2;
+    text-align: left;
+    cursor: pointer;
+    transition: color var(--dur-fast) ease;
+}
+
+.viewer-switch:hover {
+    color: var(--text);
+}
+
+.viewer-switch-track {
+    position: relative;
+    flex: none;
+    width: 30px;
+    height: 18px;
+    border-radius: 9px;
+    box-shadow: inset 0 0 0 1px var(--line-2);
+    transition:
+        background-color var(--dur-fast) ease,
+        box-shadow var(--dur-fast) ease,
+        transform var(--dur-press) var(--ease-out);
+}
+
+.viewer-switch-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--text-3);
+    transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) ease;
+}
+
+.viewer-switch:hover .viewer-switch-track::after {
+    background-color: var(--text-2);
+}
+
+.viewer-switch:active .viewer-switch-track {
+    transform: scale(.94);
+}
+
+.viewer-switch[aria-checked="true"] .viewer-switch-track {
+    background-color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.viewer-switch[aria-checked="true"] .viewer-switch-track::after {
+    background-color: var(--ink-fg);
+    transform: translateX(12px);
+}
+
+/* ==========================================================================
+   Legend: the flags the tree uses, with their meaning
+   ========================================================================== */
+
+.viewer-legend-group + .viewer-legend-group {
+    margin-top: 24px;
+}
+
+.viewer-legend-group-name {
+    margin: 0 0 12px;
+    color: var(--text-3);
+    font-size: 13.5px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.viewer-legend-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.viewer-legend-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+}
+
+.viewer-legend-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    color: var(--text-2);
+}
+
+.viewer-legend-icon .i {
+    width: 14px;
+    height: 14px;
+    vertical-align: 0;
+}
+
+.viewer-legend-labels {
+    display: grid;
+    min-width: 0;
+    padding-top: 4px;
+    color: var(--text-2);
+    font-size: 14px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.viewer-tip {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+}
+
+/* ==========================================================================
+   The tree, set as type
+   ========================================================================== */
+
+.viewer-container {
+    --indent: 24px;
+    --row: 36px;
+    --client-row: 32px;
+    --slot: 16px;
+    --guide: 7px;
+}
+
+.viewer-container .channel-container {
+    position: relative;
+}
+
+/* Nesting: every level moves in by one step */
+.viewer-container .channel-container .channel-container {
+    margin-left: var(--indent);
+}
+
+/* Rows. The hover fill reaches 10px past the text column, like a margin note */
+.viewer-container .channel,
+.viewer-container .client-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    border-radius: var(--radius-sm);
+    line-height: 1.35;
+    transition: background-color var(--dur-fast) ease;
+}
+
+.viewer-container .channel {
+    min-height: var(--row);
+    margin: 0 -10px;
+    padding: 0 10px;
+    color: var(--text-2);
+    font-size: 16px;
+}
+
+.viewer-container .channel[tabindex] {
+    cursor: pointer;
+}
+
+.viewer-container .client-container {
+    gap: 10px;
+    min-height: var(--client-row);
+    margin: 0 -10px 0 calc(var(--indent) - 10px);
+    padding: 0 10px;
+    color: var(--text-body);
+    font-size: 15px;
+}
+
+/* Hover appears at once and fades on the way out, so moving down the list never lags */
+@media (hover: hover) {
+    .viewer-container .channel[tabindex]:hover,
+    .viewer-container .client-container:hover {
+        background-color: var(--bg-2);
+        transition-duration: 0s;
+    }
+}
+
+.viewer-container .channel[tabindex]:active {
+    background-color: var(--bg-3);
+    transition-duration: 0s;
+}
+
+.viewer-container .channel:focus-visible,
+.viewer-container .client-container:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
+}
+
+/* Names give way first and truncate; icons and counts keep their size and stay on screen.
+   The weight is set here because the home page's channel list styles .channel-name too */
+.viewer-container .channel-name,
+.viewer-container .client-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 400;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+}
+
+/* A person's line is only as wide as its text, so the details popover (js/viewer.js)
+   opens right after the away message and the group suffix instead of over them */
+.viewer-container .client-name {
+    flex-grow: 0;
+}
+
+.viewer-container .is-occupied > .channel,
+.viewer-container .occupied-childs > .channel {
+    color: var(--text);
+}
+
+.viewer-container .is-occupied > .channel .channel-label {
+    font-weight: 500;
+}
+
+.viewer-container .channel-topic {
+    margin-left: 14px;
+    color: var(--text-3);
+    font-size: 14px;
+}
+
+.viewer-container .channel-icons,
+.viewer-container .client-icons {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-3);
+}
+
+.viewer-container .client-icons {
+    margin-left: auto;
+}
+
+.viewer-container .viewer-flag,
+.viewer-container .client-state {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.viewer-container .viewer-flag .i,
+.viewer-container .client-state .i {
+    width: 15px;
+    height: 15px;
+    vertical-align: 0;
+}
+
+/* Icons from the TeamSpeak server are user content: 16px, as they were drawn */
+.viewer-container .icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+.viewer-container .channel-name > .icon {
+    margin-right: 10px;
+    vertical-align: -2px;
+}
+
+.viewer-container .channel-count {
+    flex: none;
+    min-width: 2ch;
+    color: var(--text-3);
+    font-size: 14px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.viewer-container .is-full > .channel .channel-count {
+    color: var(--text-2);
+}
+
+/* Clients: a fixed slot for the voice state, then the monogram, then the name */
+.viewer-container .client-state {
+    width: var(--slot);
+    height: var(--slot);
+    color: var(--text-2);
+}
+
+.viewer-container .viewer-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    font-size: 10.5px;
+}
+
+.viewer-container .is-away .viewer-avatar {
+    opacity: .5;
+}
+
+.viewer-container .client-affix,
+.viewer-container .client-away {
+    color: var(--text-3);
+}
+
+.viewer-container .client-away {
+    margin-left: 4px;
+}
+
+.viewer-container .is-away .client-nick {
+    color: var(--text-2);
+}
+
+.viewer-container .client-country {
+    flex: none;
+    min-width: 2ch;
+    border: 0;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    text-align: right;
+    text-decoration: none;
+    cursor: default;
+}
+
+/* Hairline guides, one per parent, from under its row to its last child */
+.viewer-container .has-children::before {
+    content: "";
+    position: absolute;
+    top: var(--row);
+    bottom: 6px;
+    left: var(--guide);
+    width: 1px;
+    background: var(--line);
+    pointer-events: none;
+}
+
+.viewer-container .is-spacer.has-children::before {
+    display: none;
+}
+
+/* The server is the root and the heading of the tree, a hairline under it */
+.viewer-container .is-server {
+    margin-bottom: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.viewer-container .is-server > .channel {
+    min-height: 52px;
+    color: var(--text);
+    font-size: 26px;
+    font-weight: 500;
+    letter-spacing: -.028em;
+}
+
+.viewer-container .is-server .channel-name {
+    padding: 8px 0;
+    font-weight: 500;
+    white-space: normal;
+    line-height: 1.2;
+    text-wrap: balance;
+}
+
+.viewer-container .is-server .channel-count {
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.viewer-note {
+    margin: 4px 0 12px;
+    color: var(--text-2);
+}
+
+/* Spacers: quiet labels where the admin put them, repeated ones become a hairline */
+.viewer-container .is-spacer {
+    margin-top: 20px;
+}
+
+.viewer-container .is-spacer > .channel {
+    min-height: 28px;
+    margin: 0;
+    padding: 0;
+    color: var(--text-3);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.viewer-container .is-spacer .channel-name {
+    flex: 0 1 auto;
+    font-weight: 500;
+}
+
+.viewer-container .spacer-center > .channel {
+    justify-content: center;
+}
+
+.viewer-container .spacer-right > .channel {
+    justify-content: flex-end;
+}
+
+.viewer-container .spacer-repeat {
+    margin: 16px 0;
+}
+
+.viewer-container .spacer-repeat > .channel {
+    min-height: 0;
+    height: 1px;
+    border-radius: 0;
+    background: var(--line);
+}
+
+/* "Hide empty channels" */
+.viewer-container.hide-empty .not-occupied {
+    display: none;
+}
+
+/* ==========================================================================
+   Connect dialog: where the channel is, who is in it, what to expect
+   ========================================================================== */
+
+.viewer-connect .modal-dialog {
+    max-width: 480px;
+}
+
+.viewer-connect-head {
+    min-width: 0;
+}
+
+.viewer-connect .modal-title {
+    overflow-wrap: anywhere;
+}
+
+.viewer-connect-path {
+    margin: 0 0 6px;
+    color: var(--text-3);
+    font-size: 13.5px;
+    overflow-wrap: anywhere;
+}
+
+.viewer-connect-topic {
+    margin: 8px 0 0;
+    color: var(--text-2);
+    font-size: 14.5px;
+    overflow-wrap: anywhere;
+}
+
+.viewer-connect-people {
+    margin-top: 8px;
+    padding: 16px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+
+.viewer-connect-count {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 13.5px;
+}
+
+.viewer-connect-crowd {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.viewer-connect-crowd[hidden] {
+    display: none;
+}
+
+/* Everyone by name, two lines at most */
+.viewer-connect-names {
+    display: -webkit-box;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 14.5px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.viewer-connect .viewer-connect-alert {
+    margin: 16px 0 0;
+    font-size: 14.5px;
+}
+
+.viewer-connect-text {
+    margin: 16px 0 0;
+    color: var(--text-2);
+    font-size: 15px;
+}
+
+.viewer-connect-address {
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: .92em;
+    overflow-wrap: anywhere;
+}
+
+/* The dialog focuses its primary action when it opens; Bootstrap would paint a focused
+   .btn-primary blue. Remove once tsw.css covers :focus for all buttons (reported to the lead) */
+.viewer-connect .btn-primary:focus {
+    background-color: var(--ink);
+    border-color: var(--ink);
+    color: var(--ink-fg);
+}
+
+.viewer-connect .btn-primary:hover {
+    background-color: var(--ink-hover);
+    border-color: var(--ink-hover);
+}
+
+@media (max-width: 480px) {
+    .viewer-connect .modal-footer > .btn {
+        flex: 1 1 0;
+    }
+}
+
+/* ==========================================================================
+   Client popover: a small definition list
+   ========================================================================== */
+
+.viewer-popover {
+    min-width: 248px;
+    max-width: min(380px, calc(100vw - 32px));
+}
+
+/* Only information inside: let the pointer pass through, so a popover that opens
+   under the cursor never takes the hover away from its own row */
+@media (hover: hover) {
+    .viewer-popover {
+        pointer-events: none;
+    }
+}
+
+.viewer-popover .popover-header {
+    padding-bottom: 8px;
+    overflow-wrap: anywhere;
+}
+
+.client-facts {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 16px;
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+
+.client-facts dt {
+    color: var(--text-3);
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+/* "несколько секунд назад" next to "Последняя активность" does not fit a 360px screen */
+.client-facts dd {
+    margin: 0;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.client-facts .skeleton {
+    width: 84px;
+    height: 10px;
+    margin-top: 5px;
+}
+
+.client-facts-error {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 13.5px;
+}
+
+/* ==========================================================================
+   Mobile
+   ========================================================================== */
+
+@media (max-width: 640px) {
+    .viewer-container {
+        --indent: 16px;
+        --row: 44px;
+        --client-row: 40px;
+        --slot: 15px;
+        --guide: 5px;
+    }
+
+    .viewer-main {
+        padding-top: 28px;
+    }
+
+    .viewer-container .channel-topic {
+        display: none;
+    }
+
+    .viewer-container .is-server > .channel {
+        font-size: 21px;
+    }
+
+    .viewer-container .channel-icons,
+    .viewer-container .client-icons {
+        gap: 8px;
+    }
+}
+
+/* ==========================================================================
+   Motion. The tree has no entrance of its own: its section arrives with the page (.reveal).
+   Search filters on every key press, so rows appear and disappear without animation
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+    /* The popover comes out of the name it belongs to, and leaves the same way.
+       "translate" composes with the inline transform Popper positions it with.
+       The side comes from Bootstrap's bs-popover-* class: it is there before the first frame
+       and follows a flip, while Popper's x-placement only arrives after the entrance started */
+    .viewer-popover.fade {
+        transition: opacity var(--dur-fast) var(--ease-out), translate var(--dur-fast) var(--ease-out);
+    }
+
+    .viewer-popover.fade:not(.show) {
+        translate: -6px 0;
+    }
+
+    .viewer-popover.fade.bs-popover-bottom:not(.show) {
+        translate: 0 -6px;
+    }
+
+    .viewer-popover.fade.bs-popover-top:not(.show) {
+        translate: 0 6px;
+    }
+
+    /* Details replace the skeleton with a short fade instead of a jump */
+    .client-facts.is-loaded dd {
+        animation: viewer-fade-in var(--dur-fast) var(--ease-out) both;
+    }
+}
+
+/* Hiding empty channels (js/viewer.js): rows that stay glide to their new place, rows that leave
+   fade out where they are. Rows that come back wait until the others have nearly made room
+   (about 80% of the glide at 140ms), then fade in and settle 4px down, the way the rows under
+   them just moved, so they never draw over a row that is still passing */
+html.viewer-transition::view-transition-old(root) {
+    animation: viewer-fade-out var(--dur-fast) var(--ease-out) both;
+}
+
+html.viewer-transition::view-transition-new(root) {
+    animation: viewer-fade-in var(--dur) var(--ease-out) both;
+}
+
+::view-transition-group(*.viewer-row) {
+    animation-duration: var(--dur);
+    animation-timing-function: var(--ease-in-out);
+}
+
+::view-transition-old(*.viewer-row):only-child {
+    animation: viewer-fade-out var(--dur-fast) var(--ease-out) both;
+}
+
+::view-transition-new(*.viewer-row):only-child {
+    animation: viewer-row-appear var(--dur-fast) var(--ease-out) 140ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Keep the state change legible without movement */
+    .viewer-switch-track,
+    .viewer-switch-track::after {
+        transition-property: background-color, box-shadow;
+    }
+}
+
+@keyframes viewer-row-appear {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
+@keyframes viewer-fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes viewer-fade-out {
+    to {
+        opacity: 0;
+    }
+}

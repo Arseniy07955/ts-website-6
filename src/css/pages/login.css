@@ -1,0 +1,788 @@
+/* ==========================================================================
+   TeamSpeak login modal (templates/utils/modal-login.latte, js/login.js).
+   The modal surface, backdrop and entrance come from tsw.css. Inside, the
+   modal follows the page grid: full-width hairline bands (the step row and
+   the foot of each step) around a padded step
+   ========================================================================== */
+
+.login-modal {
+    --login-pad: 28px;
+}
+
+/* Anchored near the top instead of centred: the steps have different heights, and a
+   fixed top edge lets the panel grow or shrink downwards without moving what was read */
+.login-modal .modal-dialog {
+    max-width: 560px;
+    margin: clamp(24px, 12vh, 136px) auto 32px;
+}
+
+@media (max-width: 575.98px) {
+    .login-modal {
+        --login-pad: 20px;
+    }
+
+    /* Clear of the header on phones, and high enough to stay above the keyboard */
+    .login-modal .modal-dialog {
+        margin: clamp(12px, 9vh, 72px) 12px 12px;
+    }
+}
+
+.login-modal .modal-header {
+    padding: 18px calc(var(--login-pad) - 8px) 18px var(--login-pad);
+}
+
+.login-modal .modal-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: -.01em;
+    line-height: 1.4;
+}
+
+/* Steps: three cells between hairlines, like the stat cells on the home page.
+   The ink marker under the current cell travels when the step changes */
+
+.login-progress {
+    position: relative;
+}
+
+.login-progress-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-block: 1px solid var(--line);
+    background: var(--line);
+}
+
+.login-progress-step {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 13px 16px 14px;
+    background: var(--bg);
+    color: var(--text-3);
+    font-size: 14px;
+    line-height: 1.35;
+    transition: color var(--dur-fast) ease;
+}
+
+.login-progress-step:first-child {
+    padding-left: var(--login-pad);
+}
+
+.login-progress-step.is-done {
+    color: var(--text-2);
+}
+
+.login-progress-step.is-current {
+    color: var(--text);
+}
+
+.login-progress-label {
+    min-width: 0;
+}
+
+.login-progress-step:not(.is-done) .login-progress-done {
+    display: none;
+}
+
+/* The step's own icon, a check once it is done, a warning when it failed */
+.login-progress-icon {
+    display: grid;
+    flex: none;
+    width: 16px;
+    height: 16px;
+}
+
+.login-progress-icon > .i {
+    grid-area: 1 / 1;
+    width: 16px;
+    height: 16px;
+    transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.login-progress-icon > .is-check,
+.login-progress-icon > .is-warn,
+.login-progress-step.is-done .is-glyph,
+.login-progress-step.is-error .is-glyph {
+    opacity: 0;
+    transform: scale(.6);
+}
+
+.login-progress-step.is-done .is-check,
+.login-progress-step.is-error .is-warn {
+    opacity: 1;
+    transform: none;
+}
+
+.login-progress-step.is-error .is-warn {
+    color: var(--danger);
+}
+
+/* Covers the bottom hairline under the current cell. js/login.js sets its transform */
+.login-progress-marker {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: calc((100% - 2px) / 3);
+    height: 2px;
+    background: var(--text);
+    transition: transform var(--dur) var(--ease-in-out);
+}
+
+/* Set while the modal is closed, so a new opening starts on the right step without a slide */
+.login-progress.is-instant * {
+    transition: none !important;
+}
+
+/* The stage: one step at a time */
+
+.login-stage {
+    position: relative;
+    padding: 28px var(--login-pad) var(--login-pad);
+}
+
+.login-stage.is-animating {
+    overflow: hidden;
+}
+
+/* The step that fades out sits on top of the incoming one instead of pushing it down */
+.login-step.is-leaving {
+    position: absolute;
+    top: 28px;
+    left: var(--login-pad);
+    right: var(--login-pad);
+    pointer-events: none;
+}
+
+.login-step-title {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -.025em;
+}
+
+.login-step-text {
+    max-width: 44ch;
+    margin: 10px 0 0;
+    color: var(--text-2);
+    font-size: 15.5px;
+    line-height: 1.55;
+}
+
+/* Foot of a step: a full-width band under a hairline, for the live line or the account */
+.login-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 16px;
+    min-height: 60px;
+    margin: 32px calc(var(--login-pad) * -1) calc(var(--login-pad) * -1);
+    padding: 12px var(--login-pad);
+    border-top: 1px solid var(--line);
+    color: var(--text-3);
+    font-size: 14px;
+}
+
+/* Loading: the same rhythm as a step, a heading, two lines, an action and the foot */
+
+.login-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.login-skeleton-title {
+    width: 62%;
+    height: 24px;
+    margin: 3px 0 18px;
+    border-radius: var(--radius-sm);
+}
+
+.login-skeleton-line {
+    width: 88%;
+    height: 11px;
+    margin-bottom: 13px;
+}
+
+.login-skeleton-line.is-short {
+    width: 54%;
+}
+
+.login-skeleton-action {
+    width: 172px;
+    height: 40px;
+    margin-top: 17px;
+    border-radius: var(--radius);
+}
+
+.login-skeleton-foot {
+    align-self: stretch;
+}
+
+.login-skeleton-foot .skeleton {
+    width: 36%;
+    height: 10px;
+}
+
+/* Bootstrap paints focused buttons blue or grey, which beats the tsw.css colors.
+   Programmatic focus lands on these buttons, so keep them in their own colors here */
+.login-modal .btn-primary:focus {
+    background-color: var(--ink);
+    border-color: var(--ink);
+    color: var(--ink-fg);
+}
+
+.login-modal .btn-primary:focus:hover {
+    background-color: var(--ink-hover);
+    border-color: var(--ink-hover);
+}
+
+.login-modal .btn-secondary:focus {
+    background-color: transparent;
+    border-color: var(--line-2);
+    color: var(--text);
+}
+
+.login-modal .btn-secondary:focus:hover {
+    background-color: var(--bg-2);
+}
+
+/* Not connected */
+
+.login-connect {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 24px;
+    margin-top: 28px;
+}
+
+/* "Copied" takes no room here, it shows under the address */
+.login-connect .address {
+    position: relative;
+}
+
+.login-connect .address-feedback {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+.login-waiting p {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--text-2);
+}
+
+.login-waiting-dot {
+    background: var(--text-2);
+}
+
+/* Slow breathing says "still listening" without pulling the eye; static for reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+    .login-waiting-dot {
+        animation: breathe 2.4s ease-in-out infinite;
+    }
+}
+
+/* Debug aid for admins helping someone log in, deliberately faint */
+.loginDebugInfo {
+    padding: 0 4px;
+    border-radius: 4px;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.4;
+    opacity: .45;
+    cursor: help;
+    transition: opacity var(--dur-fast) ease;
+}
+
+.loginDebugInfo:hover,
+.loginDebugInfo:focus-visible {
+    opacity: 1;
+}
+
+/* Select account: a monogram, the nickname and the ID, rows between hairlines */
+
+.login-accounts {
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+    border-bottom: 1px solid var(--line);
+}
+
+.login-accounts li {
+    padding: 4px 0;
+    border-top: 1px solid var(--line);
+}
+
+.login-account {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: calc(100% + 24px);
+    min-height: 60px;
+    margin: 0 -12px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.login-account:active {
+    background: var(--bg-2);
+}
+
+.login-account:focus-visible {
+    outline-offset: 0;
+    border-radius: var(--radius);
+}
+
+.login-account-text {
+    display: grid;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.login-account-name {
+    font-size: 16.5px;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: -.01em;
+    overflow-wrap: anywhere;
+}
+
+.login-account-id,
+.login-who-id {
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.login-account .avatar,
+.login-account-end {
+    transition: opacity var(--dur-fast) ease;
+}
+
+.login-account-end {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    color: var(--text-3);
+}
+
+.login-account-end > * {
+    grid-area: 1 / 1;
+}
+
+.login-account-arrow {
+    width: 16px;
+    height: 16px;
+    transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast) ease, opacity var(--dur-fast) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .login-account:hover {
+        background: var(--bg-2);
+    }
+
+    .login-account:hover .login-account-arrow {
+        color: var(--text);
+        transform: translateX(3px);
+    }
+}
+
+/* While the code is being sent: the chosen row spins, the others step back */
+.login-accounts[aria-busy="true"] .login-account {
+    cursor: default;
+}
+
+.login-accounts[aria-busy="true"] .login-account:not(.is-pending) {
+    color: var(--text-3);
+}
+
+.login-accounts[aria-busy="true"] .login-account:not(.is-pending) .avatar {
+    opacity: .45;
+}
+
+.login-account.is-pending .login-account-arrow {
+    opacity: 0;
+}
+
+/* Small spinner, faded in with a short delay so fast answers never flash it */
+.login-spinner {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid;
+    border-color: currentColor transparent transparent transparent;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.login-account.is-pending .login-spinner,
+.login-code-form.is-busy .login-spinner {
+    opacity: 1;
+    transition-delay: 150ms;
+    animation: spin 700ms linear infinite;
+}
+
+/* Enter the code. One real input sits over six drawn boxes; its monospace digits are
+   spaced one box apart (1ch is exactly one digit in a monospace font), so typing, paste,
+   selection and the caret stay native */
+
+.login-code-form {
+    margin-top: 24px;
+}
+
+.login-code-row {
+    --slot-gap: 10px;
+    --slot-w: 52px;
+    container-type: inline-size;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+        "field submit ."
+        "meta meta meta";
+    align-items: center;
+    gap: 12px;
+}
+
+.login-code-field {
+    --slot-h: 60px;
+    grid-area: field;
+    position: relative;
+    width: calc(var(--slot-w) * 6 + var(--slot-gap) * 5);
+    height: var(--slot-h);
+    /* The input runs past the last box (see below); the part outside is neither drawn nor clickable.
+       clip, not hidden: a hidden box still scrolls itself to show the caret after the sixth digit */
+    overflow: hidden;
+    overflow: clip;
+}
+
+.login-code-slots {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--slot-gap);
+    pointer-events: none;
+}
+
+.login-code-slot {
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    transition: border-color var(--dur-fast) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .login-code-field:hover .login-code-slot {
+        border-color: var(--text-3);
+    }
+}
+
+.login-code-slot.is-active {
+    border-color: var(--text) !important;
+}
+
+/* A selection (after a wrong code the whole code is selected, so typing replaces it) fills the boxes */
+.login-code-slot.is-selected {
+    background: var(--selection);
+}
+
+.login-code-form.is-invalid .login-code-slot {
+    border-color: var(--danger) !important;
+}
+
+.login-code-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Wider than the boxes: the caret after the sixth digit sits past them, and an input
+       that is too narrow for its caret scrolls its text out of the boxes */
+    width: calc(100% + var(--slot-w) + var(--slot-gap));
+    height: 100%;
+    margin: 0;
+    padding: 0 0 0 calc((var(--slot-w) - 1ch) / 2);
+    border: 0;
+    border-radius: 0;
+    outline: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text);
+    caret-color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: calc(var(--slot-w) + var(--slot-gap) - 1ch);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Focus is drawn by the box that takes the next digit */
+.login-code-input:focus,
+.login-code-input:focus-visible {
+    outline: 0;
+}
+
+/* The native highlight would run across the gaps between the boxes */
+.login-code-input::selection {
+    background: transparent;
+    color: var(--text);
+}
+
+.login-code-submit {
+    grid-area: submit;
+    position: relative;
+    min-height: 60px;
+    padding-inline: 24px;
+}
+
+.login-code-submit .login-spinner {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+}
+
+.login-code-submit-label {
+    transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.login-code-form.is-busy .login-code-submit {
+    pointer-events: none;
+}
+
+.login-code-form.is-busy .login-code-submit-label {
+    opacity: 0;
+    transition-delay: 150ms;
+}
+
+/* The hint, the error with "Resend code", and the answer to it take the same line.
+   It only wraps if a translation is longer than the 360px layout allows */
+.login-code-meta {
+    grid-area: meta;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 22px;
+    font-size: 14px;
+    line-height: 22px;
+}
+
+.login-code-meta p {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: auto;
+    margin: 0;
+}
+
+.login-code-life {
+    color: var(--text-3);
+}
+
+.login-code-form.is-invalid .login-code-life,
+.login-code-form.has-note .login-code-life {
+    display: none;
+}
+
+.login-code-meta .invalid-feedback {
+    font-size: 14px;
+}
+
+.login-code-meta .invalid-feedback[hidden] {
+    display: none;
+}
+
+.login-code-note {
+    color: var(--text-2);
+}
+
+.login-resend {
+    display: inline-grid;
+    align-items: center;
+    margin-left: 16px;
+    font-size: 14px;
+    line-height: 22px;
+}
+
+.login-resend > * {
+    grid-area: 1 / 1;
+}
+
+.login-resend .login-spinner {
+    justify-self: start;
+}
+
+.login-resend-label {
+    transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+/* While the new code is on its way the words give way to the spinner, as on the Login button */
+.login-resend.is-pending {
+    cursor: default;
+}
+
+.login-resend.is-pending .login-spinner {
+    opacity: 1;
+    transition-delay: 150ms;
+    animation: spin 700ms linear infinite;
+}
+
+.login-resend.is-pending .login-resend-label {
+    opacity: 0;
+    transition-delay: 150ms;
+}
+
+/* The account the code went to */
+
+.login-who {
+    justify-content: flex-start;
+}
+
+.login-who .avatar {
+    flex: none;
+}
+
+.login-who-text {
+    display: grid;
+    min-width: 0;
+    margin-right: auto;
+}
+
+.login-who-name {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.login-back {
+    flex: none;
+    font-size: 14px;
+}
+
+/* The arrow points back, so it nudges back */
+@media (hover: hover) and (pointer: fine) {
+    .login-back:hover .i {
+        transform: translateX(-3px);
+    }
+}
+
+/* Error */
+
+.login-error .alert {
+    margin-bottom: 20px;
+}
+
+@media (max-width: 575.98px) {
+    .login-step-title {
+        font-size: 24px;
+    }
+
+    .login-connect {
+        gap: 14px 20px;
+    }
+
+    /* Three narrow cells: the icon sits above the label */
+    .login-progress-step {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 12px 12px 13px;
+        font-size: 13px;
+    }
+
+    /* The boxes fill the row, the hint and the button go under them */
+    .login-code-row {
+        --slot-gap: 8px;
+        --slot-w: 42px;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "field"
+            "meta"
+            "submit";
+    }
+
+    .login-code-field {
+        --slot-h: 54px;
+    }
+
+    .login-code-input {
+        font-size: 24px;
+    }
+
+    .login-code-submit {
+        width: 100%;
+        min-height: 48px;
+        margin-top: 4px;
+    }
+}
+
+@supports (width: 1cqi) {
+    @media (max-width: 575.98px) {
+        .login-code-row {
+            --slot-w: calc((100cqi - var(--slot-gap) * 5) / 6);
+        }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-account-arrow,
+    .login-back .i {
+        transform: none !important;
+    }
+
+    .login-progress-icon > .i {
+        transform: none !important;
+    }
+
+    /* The marker fades from cell to cell instead of sliding */
+    .login-progress-marker {
+        display: none;
+    }
+
+    .login-progress-step::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -1px;
+        height: 2px;
+        background: var(--text);
+        opacity: 0;
+        transition: opacity var(--dur-fast) ease;
+    }
+
+    .login-progress-step.is-current::after {
+        opacity: 1;
+    }
+
+    .login-spinner {
+        animation-duration: 2.4s !important;
+    }
+}

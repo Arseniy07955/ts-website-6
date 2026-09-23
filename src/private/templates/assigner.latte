@@ -1,141 +1,372 @@
 {extends "body.latte"}
 {var $title = __get("ASSIGNER_TITLE")}
 {var $navActiveIndex = 2}
+{var $flushPage = true}
 
-{block content}
+{* Result of the last save. Dismissing it lets the page glide up (js/assigner.js) *}
+{define notice}
+    <div class="alert alert-{$type} has-icon alert-dismissible fade show assigner-notice" role="{$role}">
+        {icon($iconName, "alert-icon")}
+        {$text}
+        <button type="button" class="close" data-dismiss="alert" aria-label="{_"ARIA_CLOSE"}">{icon("x")}</button>
+    </div>
+{/define}
 
-    <div class="card card-accent">
-        <div class="card-header bigger-title">
-            <i class="fas fa-gamepad"></i>{_"ASSIGNER_PANEL_TITLE"}
-        </div>
-        <div class="card-body group-assigner">
-            {if !$isLoggedIn}
-                <div class="text-center">
-                    <h4 class="mb-4">{_"ASSIGNER_NOT_LOGGED_IN"}</h4>
+{* Square in front of a group: its TeamSpeak icon, or a quiet tag when it has none *}
+{define groupIcon}
+    <span class="assigner-icon" aria-hidden="true">
+        {if $group["iconid"]}
+            <img src="api/geticon.php?iconid={$group["iconid"]}" alt="" width="16" height="16" loading="lazy">
+        {else}
+            {icon("tag")}
+        {/if}
+    </span>
+{/define}
 
-                    <button type="button" class="btn btn-primary btn-lg" data-openLoginModal>
-                        <i class="fas fa-sign-in-alt"></i>{_"ASSIGNER_LOGIN_BUTTON"}
-                    </button>
-                </div>
-            {elseif $assignerConfig === null}
-                {include "utils/data-problem.latte", message => __get("CANNOT_GET_DATA", "assigner")}
-            {elseif empty($assignerConfig)}
-                <div class="alert alert-info mb-0">
-                    <i class="fas fa-info-circle"></i>{_"ASSIGNER_NOT_CONFIGURED"}
-                </div>
-            {elseif !$canUseAssigner}
-                <div class="alert alert-danger">
-                    <i class="fa fa-exclamation-circle"></i>{_"ASSIGNER_NO_REQUIRED_GROUPS"}
+{* How many people with a group are online now, with the first few of them as monograms *}
+{define groupMembers}
+    {var $people = $groupMembers[$group["sgid"]] ?? null}
+    <span n:if="$people !== null" class="assigner-members" id="assigner-members-{$group["sgid"]}">
+        <span n:if="$people" class="avatar-stack" aria-hidden="true">
+            {foreach array_slice($people, 0, 3) as $memberName}{avatar($memberName)}{/foreach}
+        </span>
+        <span class="assigner-members-count tabular" aria-hidden="true">{icon("users", "i-sm")}{count($people)}</span>
+        <span class="sr-only">{_"ASSIGNER_MEMBERS_ONLINE", count($people)}</span>
+    </span>
+{/define}
+
+{* Categories as a grid of cells. The form checks groups, the catalog only lists them *}
+{define categoryGrid}
+    <div n:class="assigner-grid, !$interactive ? is-catalog">
+        {foreach $categories as $index => $category}
+            {var $used = $category["assignedCount"] ?? 0}
+            {var $max = (int) $category["max"]}
+            {* What can really be picked: a "no limit" max like 99 still ends at the last group *}
+            {var $limit = min($max, count($category["groups"]))}
+            {* An odd last category spans the row; its groups flow in two columns *}
+            {var $wide = $iterator->last && $iterator->counter % 2 === 1}
+
+            {if $interactive}
+                <div n:class="assigner-category, reveal, $wide ? is-wide, $used > $limit ? is-over" style="--i: {min($iterator->counter, 4) + 2}"
+                     role="group" aria-labelledby="assigner-name-{$index}"
+                     aria-describedby="assigner-count-{$index} assigner-hint-{$index}{if $onCooldown} assigner-cooldown-fact{/if}"
+                     data-maxgroups="{$max}" data-limit="{$limit}">
+                    <div class="assigner-head">
+                        <div class="assigner-head-text">
+                            <h2 class="assigner-name" id="assigner-name-{$index}">
+                                {if !empty($category["icon"])}<i class="{$category["icon"]}" aria-hidden="true"></i>{/if}{$category["name"]}
+                            </h2>
+                            <p class="assigner-hint" id="assigner-hint-{$index}">
+                                {* While the choice is locked, "you can pick more" would be a promise the page can't keep *}
+                                {if $onCooldown}
+                                    {_"ASSIGNER_MAX_HINT", $limit}
+                                {elseif $used > $limit}
+                                    {_"ASSIGNER_HINT_OVER", $used - $limit}
+                                {elseif $used === $limit}
+                                    {_"ASSIGNER_HINT_FULL"}
+                                {else}
+                                    {_"ASSIGNER_HINT_LEFT", $limit - $used}
+                                {/if}
+                            </p>
+                        </div>
+
+                        <div class="assigner-gauge">
+                            <p class="assigner-count" id="assigner-count-{$index}">
+                                <span class="assigner-used" data-value="{$used}"><span>{$used}</span></span><span class="assigner-count-max"> / {$limit}</span>
+                            </p>
+                            {* One slot per group the category allows, drawn like the level meter on the home page.
+                               More slots than fit side by side turn into one continuous meter *}
+                            {if $limit <= 10}
+                                <span class="assigner-meter" aria-hidden="true">
+                                    {for $slot = 0; $slot < $limit; $slot++}<span n:class="assigner-slot, $slot < $used ? is-filled"></span>{/for}
+                                </span>
+                            {else}
+                                <span class="assigner-meter is-continuous" style="--fill: {sprintf("%.4F", min($used / $limit, 1))}" aria-hidden="true"></span>
+                            {/if}
+                        </div>
+                    </div>
+
+                    <ul class="assigner-options">
+                        <li n:foreach="$category['groups'] as $group">
+                            {* The whole line is the label; the real checkbox covers it, invisible but focusable *}
+                            <label n:class="assigner-option, $onCooldown ? is-disabled">
+                                <input type="checkbox" class="assigner-input"
+                                       id="assignerCheck{$group["sgid"]}"
+                                       name="assigner[{$group["sgid"]}]"
+                                       aria-labelledby="assigner-group-{$group["sgid"]}"
+                                       n:attr="checked => $group['assigned'], disabled => $onCooldown,
+                                               aria-describedby => isset($groupMembers[$group['sgid']]) ? 'assigner-members-' . $group['sgid']">
+                                {include groupIcon, group => $group}
+                                <span class="assigner-option-name" id="assigner-group-{$group["sgid"]}">{$group["name"]}</span>
+                                {include groupMembers, group => $group, groupMembers => $groupMembers}
+                                <span class="assigner-box" aria-hidden="true">{icon("check", "assigner-check")}</span>
+                            </label>
+                        </li>
+                    </ul>
                 </div>
             {else}
-                {ifset $groupChangeStatus}
-                    {if $groupChangeStatus === 0} {* saved *}
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            <i class="far fa-check-circle"></i>{_"ASSIGNER_SAVE_SUCCESS"}
-                            <button type="button" class="close" data-dismiss="alert" aria-label="{_"ARIA_CLOSE"}">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+                <section n:class="assigner-category, reveal, $wide ? is-wide" style="--i: {min($iterator->counter, 4) + 2}" aria-labelledby="assigner-name-{$index}">
+                    <div class="assigner-head">
+                        <div class="assigner-head-text">
+                            <h2 class="assigner-name" id="assigner-name-{$index}">
+                                {if !empty($category["icon"])}<i class="{$category["icon"]}" aria-hidden="true"></i>{/if}{$category["name"]}
+                            </h2>
+                            <p class="assigner-hint">{_"ASSIGNER_MAX_HINT", $limit}</p>
                         </div>
-                    {elseif $groupChangeStatus === 1} {* no change *}
-                        <div class="alert alert-info alert-dismissible fade show" role="alert">
-                            <i class="fas fa-info-circle"></i>{_"ASSIGNER_SAVE_NO_CHANGE"}
-                            <button type="button" class="close" data-dismiss="alert" aria-label="{_"ARIA_CLOSE"}">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                    {else} {* something went wrong *}
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <i class="fas fa-exclamation-circle"></i>{_"ASSIGNER_SAVE_ERROR"}
-                            <button type="button" class="close" data-dismiss="alert" aria-label="{_"ARIA_CLOSE"}">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                    {/if}
-                {/ifset}
+                    </div>
 
-                {if $cooldownRemaining > 0}
-                    <div class="alert alert-warning">
-                        <i class="fas fa-hourglass-half"></i>{_"ASSIGNER_COOLDOWN_MESSAGE", "<span id=\"cooldown-timer\"></span>"}
+                    <ul class="assigner-options">
+                        <li n:foreach="$category['groups'] as $group" class="assigner-option">
+                            {include groupIcon, group => $group}
+                            <span class="assigner-option-name">{$group["name"]}</span>
+                            {include groupMembers, group => $group, groupMembers => $groupMembers}
+                        </li>
+                    </ul>
+                </section>
+            {/if}
+        {/foreach}
+    </div>
+{/define}
+
+{block content}
+    {var $onCooldown = $cooldownRemaining > 0}
+    {var $problem = !$tsAvailable || ($isLoggedIn && $assignerConfig === null)}
+    {var $notConfigured = !$problem && ($isLoggedIn ? empty($assignerConfig) : $catalog === [])}
+    {var $noRequired = !$problem && !$notConfigured && $isLoggedIn && !$canUseAssigner}
+    {var $formMode = !$problem && !$notConfigured && $isLoggedIn && $canUseAssigner}
+    {var $invite = !$problem && !$notConfigured && !$isLoggedIn}
+    {* The read-only catalog shows what can be picked to whoever cannot pick yet *}
+    {var $showCatalog = ($invite || $noRequired) && $catalog}
+    {var $side = $isLoggedIn ? $userGroups !== null : $invite}
+
+    <header n:class="split, assigner-hero, !$side ? is-single">
+        <div class="split-main assigner-hero-main reveal">
+            <h1 class="page-title">{_"ASSIGNER_PANEL_TITLE"}</h1>
+            {* The intro promises what the form does: only where the form is, or will be after logging in *}
+            {if $formMode && $onCooldown}
+                <p class="page-sub">{_"ASSIGNER_COOLDOWN_LEAD"}</p>
+            {elseif $formMode || $invite}
+                <p class="page-sub">{_"ASSIGNER_INTRO"}</p>
+            {/if}
+
+            {ifset $groupChangeStatus}
+                {if $groupChangeStatus === 0}
+                    {include notice, type => "success", iconName => "check-circle", text => __get("ASSIGNER_SAVE_SUCCESS"), role => "status"}
+                {elseif $groupChangeStatus === 1}
+                    {include notice, type => "info", iconName => "info", text => __get("ASSIGNER_SAVE_NO_CHANGE"), role => "status"}
+                {else}
+                    {include notice, type => "danger", iconName => "warning-circle", text => __get("ASSIGNER_SAVE_ERROR"), role => "alert"}
+                {/if}
+            {/ifset}
+
+            {if $problem}
+                {* body.latte already shows the connection problems above the page, so no second "show problems" here *}
+                <div class="assigner-state">
+                    {include "utils/data-problem.latte", message => __get("ASSIGNER_DATA_PROBLEM"), tsExceptions => []}
+                </div>
+            {elseif $notConfigured}
+                <div class="empty-state assigner-state">
+                    {icon("tag")}
+                    <p class="empty-state-title">{_"ASSIGNER_NOT_CONFIGURED"}</p>
+                </div>
+            {elseif $noRequired}
+                <div class="alert has-icon assigner-state" role="alert">
+                    {icon("lock-simple", "alert-icon")}
+                    {_"ASSIGNER_NO_REQUIRED_GROUPS"}
+                    <p n:if="$requiredGroups" class="assigner-required">{_"ASSIGNER_REQUIRED", implode(", ", $requiredGroups)}</p>
+                </div>
+            {elseif $invite}
+                <div class="hero-actions assigner-invite">
+                    <button type="button" class="btn btn-primary btn-lg assigner-login" data-openLoginModal>
+                        {_"ASSIGNER_LOGIN_BUTTON"}{icon("arrow-right", "i-arrow")}
+                    </button>
+
+                    <button type="button" class="address" data-copy="{$config["query_displayip"]}" aria-label="{_"COPY_ADDRESS"}: {$config["query_displayip"]}">
+                        <span>{$config["query_displayip"]}</span>
+                        {icon("copy")}
+                        <span class="address-feedback" aria-live="polite">{_"COPIED"}</span>
+                    </button>
+                </div>
+            {/if}
+
+            {* Who is picking: the account the TeamSpeak login confirmed *}
+            <div n:if="$isLoggedIn" class="assigner-user">
+                {avatar($nickname, "avatar-lg")}
+                <div class="assigner-user-text">
+                    <p class="assigner-user-name">{$nickname}</p>
+                    <p class="assigner-user-meta">{_"ASSIGNER_ACCOUNT_VIA"} <span class="mono">{_"ASSIGNER_ACCOUNT_ID", $cldbid}</span></p>
+                </div>
+            </div>
+        </div>
+
+        {if $side}
+            <aside class="split-side reveal" style="--i: 1">
+                {if $isLoggedIn}
+                    {* Saved state straight from the server; the form below is what may change *}
+                    <section class="side-block" aria-labelledby="assigner-owned-title">
+                        <div class="side-head">
+                            <h2 class="side-title" id="assigner-owned-title">{_"ASSIGNER_ACCOUNT_GROUPS"}</h2>
+                            <span class="assigner-side-count tabular">{count($userGroups)}</span>
+                        </div>
+
+                        {var $categoryOf = []}
+                        {foreach $assignerConfig ?: [] as $category}
+                            {foreach $category["groups"] as $sgid => $group}
+                                {php $categoryOf[$sgid] = $category["name"]}
+                            {/foreach}
+                        {/foreach}
+
+                        <ul class="assigner-owned">
+                            <li n:foreach="$userGroups as $group">
+                                {include groupIcon, group => $group}
+                                <span class="assigner-owned-name">{$group["name"]}</span>
+                                <span n:ifset="$categoryOf[$group['sgid']]" class="assigner-owned-category">{$categoryOf[$group["sgid"]]}</span>
+                            </li>
+                        </ul>
+                    </section>
+                {else}
+                    <section class="side-block" aria-labelledby="assigner-howto-title">
+                        <div class="side-head">
+                            <h2 class="side-title" id="assigner-howto-title">{_"ASSIGNER_HOWTO_TITLE"}</h2>
+                        </div>
+
+                        <ol class="howto">
+                            <li>
+                                <span class="howto-icon" aria-hidden="true">{icon("plugs-connected")}</span>
+                                <div>
+                                    <p class="howto-title">{_"HOME_HOWTO_CONNECT"}</p>
+                                    <a class="howto-link mono" href="ts3server://{$config["query_displayip"]|escapeUrl}">{$config["query_displayip"]}</a>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="howto-icon" aria-hidden="true">{icon("sign-in")}</span>
+                                <div>
+                                    <p class="howto-title">{_"ASSIGNER_HOWTO_LOGIN"}</p>
+                                    <p class="assigner-howto-note">{_"ASSIGNER_HOWTO_LOGIN_NOTE"}</p>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="howto-icon" aria-hidden="true">{icon("tag")}</span>
+                                <div>
+                                    <p class="howto-title">{_"ASSIGNER_HOWTO_PICK"}</p>
+                                    <p class="assigner-howto-note">{_"ASSIGNER_HOWTO_PICK_NOTE"}</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </section>
+                {/if}
+            </aside>
+        {/if}
+    </header>
+
+    {if $formMode || $showCatalog}
+        {var $categories = $formMode ? $assignerConfig : $catalog}
+        {var $groupTotal = 0}
+        {var $allowed = 0}
+        {var $selected = 0}
+        {foreach $categories as $category}
+            {php $groupTotal += count($category["groups"])}
+            {php $allowed += min((int) $category["max"], count($category["groups"]))}
+            {php $selected += $category["assignedCount"] ?? 0}
+        {/foreach}
+        {var $cellCount = 3 + ($membersTotal !== null ? 1 : 0)}
+
+        {* Facts about the assigner, all from the server and the site config *}
+        <section class="assigner-facts reveal" style="--i: 2" aria-label="{_"ASSIGNER_FACTS_LABEL"}">
+            <dl class="cells" style="--cols: {$cellCount}">
+                <div n:if="$formMode" class="cell">
+                    <dt>{icon("check-circle", "i-sm")}{_"ASSIGNER_FACT_SELECTED"}</dt>
+                    <dd><span class="assigner-used assigner-total" data-value="{$selected}"><span>{$selected}</span></span></dd>
+                    <dd class="cell-sub">{_"ASSIGNER_FACT_SELECTED_OF", $allowed}</dd>
+                </div>
+                {* Visitors who cannot pick see the size of the catalog in two cells instead *}
+                {if $formMode}
+                    <div class="cell">
+                        <dt>{icon("tag", "i-sm")}{_"ASSIGNER_FACT_CATEGORIES"}</dt>
+                        <dd>{count($categories)}</dd>
+                        <dd class="cell-sub">{_"ASSIGNER_FACT_GROUPS", $groupTotal}</dd>
+                    </div>
+                {else}
+                    <div class="cell">
+                        <dt>{icon("tag", "i-sm")}{_"ASSIGNER_FACT_CATEGORIES"}</dt>
+                        <dd>{count($categories)}</dd>
+                    </div>
+                    <div class="cell">
+                        <dt>{icon("hash", "i-sm")}{_"ASSIGNER_FACT_GROUPS_SHORT"}</dt>
+                        <dd>{$groupTotal}</dd>
+                        <dd class="cell-sub">{_"ASSIGNER_FACT_GROUPS_EACH", $allowed}</dd>
                     </div>
                 {/if}
-
-                <form id="assigner-form" method="post">
-                    {foreach $assignerConfig as $row}
-                        <div class="row justify-content-md-center">
-                            {foreach $row as $assignerCategory}
-                                <div class="col-md-6">
-                                    <div class="list-group assigner-category" data-maxgroups="{$assignerCategory["max"]}">
-                                        <li class="list-group-item assigner-header">
-                                            <div>
-                                                {ifset $assignerCategory["icon"]}
-                                                    <i class="{$assignerCategory["icon"]}"></i>
-                                                {/ifset}
-
-                                                {$assignerCategory["name"]}
-                                            </div>
-                                            <div>
-                                                <span class="badge badge-primary badge-pill"></span>
-                                            </div>
-                                        </li>
-
-                                        {foreach $assignerCategory["groups"] as $group}
-                                            <div n:class="list-group-item, list-group-item-action, $cooldownRemaining > 0 ? disabled">
-                                                <div>
-                                                    {if $group["iconid"]}
-                                                        <img src="api/geticon.php?iconid={$group["iconid"]}" alt="{$group["name"]} icon" class="assigner-icon">
-                                                    {else}
-                                                        <span class="assigner-icon-margin"></span>
-                                                    {/if}
-                                                    {$group["name"]}
-                                                </div>
-                                                <div>
-                                                    <div class="custom-control custom-checkbox">
-                                                        <input type="checkbox" class="custom-control-input"
-                                                               id="assignerCheck{$group["sgid"]}"
-                                                               name="assigner[{$group["sgid"]}]"
-                                                            n:attr="checked => $group['assigned'], readonly => $cooldownRemaining > 0">
-                                                        <label class="custom-control-label" for="assignerCheck{$group["sgid"]}">&nbsp;</label>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        {/foreach}
-                                    </div>
-                                </div>
-                            {/foreach}
-                        </div>
-                    {/foreach}
-
-                    {$csrfField}
-
-                    <!-- Pass this field so even when someone un-checks all of the groups -->
-                    <!-- there will still be something send to the server, and script will remove -->
-                    <!-- all of the user's groups. the "dummy" will get filtered out with array_filter -->
-                    <input type="hidden" name="assigner[dummy]">
-
-                    {if  $cooldownRemaining <= 0}
-                        <div class="text-center">
-                            <button type="submit" class="btn btn-primary btn-lg assigner-save">
-                                <i class="far fa-save"></i>{_"ASSIGNER_SAVE_BUTTON"}
-                            </button>
-
-                            <div>
-                                <div class="alert alert-danger mt-3 invalid-groups-alert" style="display: none">
-                                    <i class="fa fa-exclamation-circle"></i>{_"ASSIGNER_INVALID_GROUPS"}
-                                </div>
-                            </div>
-                        </div>
+                <div n:if="$membersTotal !== null" class="cell">
+                    <dt>{icon("users-three", "i-sm")}{_"ASSIGNER_FACT_ONLINE"}</dt>
+                    <dd>{$membersTotal}</dd>
+                    <dd class="cell-sub">{_"ASSIGNER_FACT_ONLINE_SUB"}</dd>
+                </div>
+                <div n:class="cell, $onCooldown ? is-waiting" id="assigner-cooldown-fact">
+                    <dt>{icon($onCooldown ? "hourglass-medium" : "timer", "i-sm")}{_"ASSIGNER_FACT_CHANGES"}</dt>
+                    {if $formMode && $onCooldown}
+                        {* No live region here: the timer would be read out every second *}
+                        <dd>
+                            <span class="assigner-wait-dot" aria-hidden="true"></span>
+                            <span id="cooldown-timer" class="tabular" data-seconds="{$cooldownRemaining}">{sprintf("%02d:%02d", intdiv($cooldownRemaining, 60), $cooldownRemaining % 60)}</span>
+                        </dd>
+                        <dd class="cell-sub">{_"ASSIGNER_CHANGES_WAIT"}</dd>
+                    {elseif $cooldownText !== null}
+                        <dd>{_"ASSIGNER_CHANGES_EVERY", $cooldownText}</dd>
+                        <dd n:if="$formMode" class="cell-sub">{_"ASSIGNER_CHANGES_NOW"}</dd>
+                    {else}
+                        <dd>{_"ASSIGNER_CHANGES_ANYTIME"}</dd>
                     {/if}
-                </form>
-            {/if}
-        </div>
-    </div>
+                </div>
+            </dl>
+        </section>
 
+        {if $formMode}
+            <form id="assigner-form" n:class="assigner, $onCooldown ? is-locked" method="post">
+                {include categoryGrid, categories => $assignerConfig, interactive => true, onCooldown => $onCooldown, groupMembers => $groupMembers}
+
+                {$csrfField}
+
+                <!-- Pass this field so even when someone un-checks all of the groups -->
+                <!-- there will still be something send to the server, and script will remove -->
+                <!-- all of the user's groups. the "dummy" will get filtered out with array_filter -->
+                <input type="hidden" name="assigner[dummy]">
+
+                {if !$onCooldown}
+                    {* Ends the form; follows the viewport while there are unsaved changes (js/assigner.js) *}
+                    <div class="assigner-bar">
+                        <p class="assigner-status" aria-live="polite">
+                            <span class="assigner-note assigner-idle is-visible">{_"ASSIGNER_BAR_HINT"}</span>
+                            <span class="assigner-note assigner-dirty"><span class="assigner-dirty-dot" aria-hidden="true"></span><span class="assigner-dirty-text">{_"ASSIGNER_UNSAVED"}</span></span>
+                            <span class="assigner-note invalid-groups-alert">{icon("warning-circle")}{_"ASSIGNER_INVALID_GROUPS"}</span>
+                            <span class="assigner-note assigner-saving">{_"ASSIGNER_SAVING"}</span>
+                        </p>
+
+                        <div class="assigner-bar-actions">
+                            <button type="button" class="btn btn-secondary assigner-reset" disabled>{_"ASSIGNER_RESET"}</button>
+                            <button type="submit" class="btn btn-primary assigner-save">
+                                <span class="assigner-save-label">{_"ASSIGNER_SAVE_BUTTON"}</span>
+                                {icon("circle-notch", "assigner-spinner")}
+                            </button>
+                        </div>
+                    </div>
+                    <span class="assigner-bar-anchor" aria-hidden="true"></span>
+                {/if}
+            </form>
+        {else}
+            {include categoryGrid, categories => $catalog, interactive => false, onCooldown => false, groupMembers => $groupMembers}
+        {/if}
+    {/if}
 {/block}
 
 {block footerbottom}
     <script>
-        var cooldownRemaining = {$cooldownRemaining ?? null}
+        var ASSIGNER_LANG = {
+            changes: {__get("ASSIGNER_CHANGES_COUNT")},
+            hintLeft: {__get("ASSIGNER_HINT_LEFT")},
+            hintFull: {__get("ASSIGNER_HINT_FULL")},
+            hintOver: {__get("ASSIGNER_HINT_OVER")}
+        }
     </script>
-
     {$tplutils::includeScript("js/assigner.js", true)}
 {/block}

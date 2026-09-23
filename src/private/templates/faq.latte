@@ -1,42 +1,182 @@
 {extends "body.latte"}
 {var $title = __get("FAQ_TITLE")}
 {var $navActiveIndex = 5}
+{var $flushPage = true}
 
 {block content}
-    <div class="card card-accent">
-        <div class="card-header bigger-title">
-            <i class="far fa-question-circle"></i>{_"FAQ_PANEL_TITLE"}
+    {* Title and search share the columns of the split below: the search lines up with the side column *}
+    <header class="section page-hero faq-hero reveal">
+        <div class="faq-hero-text">
+            <h1 class="page-title">{_"FAQ_PANEL_TITLE"}</h1>
+            <p class="page-sub">{_"FAQ_INTRO"}</p>
         </div>
-        <div class="card-body">
-            {$additionaltext|noescape}
 
-            <div class="accordion" id="faqaccordion">
-                {foreach $qa as $id => $value}
-                    <div class="card">
-                        <div class="card-header" id="faqcollapse-heading-{$id}">
-                            <button class="btn btn-link btn-block" type="button" data-toggle="collapse" data-target="#faqcollapse-{$id}" aria-expanded="true" aria-controls="faqcollapse-{$id}">
-                                {$id + 1}. {$value["question"]|noescape}
-                            </button>
-                            <i class="fas fa-link copy-faq-url" data-faqid="{$id}" data-toggle="tooltip" title="{_"FAQ_COPY_LINK"}"></i>
-                        </div>
+        <div n:if="$qa" class="faq-hero-tools">
+            {* Filters the questions as you type (js/faq.js); needs JavaScript, so it is hidden without it *}
+            <div class="faq-search" role="search">
+                <label class="sr-only" for="faq-search">{_"FAQ_SEARCH_LABEL"}</label>
+                {icon("magnifying-glass", "faq-search-icon")}
+                <input type="search" class="form-control" id="faq-search" aria-controls="faqaccordion"
+                       placeholder="{_"FAQ_SEARCH_LABEL"}" autocomplete="off" spellcheck="false" enterkeyhint="search">
+                <button type="button" class="btn-reset faq-search-clear" data-faq-clear aria-label="{_"FAQ_SEARCH_CLEAR"}" hidden>
+                    {icon("x")}
+                </button>
+            </div>
 
-                        <div id="faqcollapse-{$id}" class="collapse" aria-labelledby="faqcollapse-heading-{$id}" data-parent="#faqaccordion">
-                            <div class="card-body">
-                                {$value["answer"]|noescape}
-                            </div>
-                        </div>
-                    </div>
-                {/foreach}
+            <div class="faq-facts">
+                <p class="faq-fact" aria-live="polite">
+                    {icon("question", "i-sm")}
+                    <span data-faq-count>{_"FAQ_COUNT", count($qa)}</span>
+                </p>
+
+                {* The newest lastmodify of all answers; the date turns relative in js/script.js *}
+                <p n:if="$updated" class="faq-fact">
+                    {icon("pencil-simple", "i-sm")}
+                    <span>{_"FAQ_UPDATED"} {$updated|fuzzyDateAbbr}</span>
+                </p>
             </div>
         </div>
+    </header>
+
+    <div class="split faq-split">
+        <div n:class="split-main, $qa ? faq-main">
+            {if $qa}
+                {* Every question opens on its own. "#faqN" (N starts at 1) is a shareable link, js/faq.js opens it *}
+                <div class="faq" id="faqaccordion">
+                    <section class="faq-item reveal" n:foreach="$qa as $id => $value" id="faq{$id + 1}" style="--i: {min($id + 1, 6)}">
+                        <h2 class="faq-q" id="faqcollapse-heading-{$id}">
+                            <button class="faq-toggle collapsed" type="button" data-toggle="collapse" data-target="#faqcollapse-{$id}" aria-expanded="false" aria-controls="faqcollapse-{$id}">
+                                <span class="faq-q-body">
+                                    <span class="faq-q-text">{$value["question"]|noescape}</span>
+                                    {* The start of the answer while it is closed; hidden from screen readers,
+                                       which read the whole answer once it opens *}
+                                    <span n:if="$value['answerPreview'] !== ''" class="faq-preview" aria-hidden="true">
+                                        <span class="faq-preview-clip"><span class="faq-preview-text">{$value["answerPreview"]}</span></span>
+                                    </span>
+                                </span>
+                                {icon("plus", "faq-plus")}
+                            </button>
+                        </h2>
+
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm faq-copy" data-faqid="{$id}"
+                                data-toggle="tooltip" title="{_"FAQ_COPY_LINK"}" aria-label="{_"FAQ_COPY_LINK"}">
+                            {icon("link", "faq-copy-link")}
+                            {icon("check", "faq-copy-done")}
+                        </button>
+
+                        <div id="faqcollapse-{$id}" class="collapse faq-a" role="region" aria-labelledby="faqcollapse-heading-{$id}">
+                            <div class="faq-a-body">
+                                <div class="faq-a-inner prose">
+                                    {$value["answer"]|noescape}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                {* Shown by js/faq.js when the search matches nothing *}
+                <div class="empty-state faq-no-results" hidden>
+                    {icon("magnifying-glass")}
+                    <p class="empty-state-title" data-faq-empty-title></p>
+                    <p>{_"FAQ_SEARCH_EMPTY_HINT"}</p>
+
+                    <div class="faq-no-results-actions">
+                        <a class="btn btn-secondary" href="ts3server://{$config["query_displayip"]|escapeUrl}">
+                            {icon("headset")}{_"FAQ_ASK_STAFF"}
+                        </a>
+                        <button type="button" class="btn btn-ghost" data-faq-clear>{_"FAQ_SEARCH_CLEAR"}</button>
+                    </div>
+                </div>
+            {else}
+                <div class="empty-state reveal" style="--i: 1">
+                    {icon("question")}
+                    <p class="empty-state-title">{_"FAQ_EMPTY_TITLE"}</p>
+                    <p>{_"FAQ_EMPTY_TEXT"}</p>
+                </div>
+            {/if}
+        </div>
+
+        <aside class="split-side reveal" style="--i: 2">
+            <div class="faq-side">
+                {* Every question once more, as links; the ones that are open are marked (js/faq.js) *}
+                <nav n:if="$qa" class="side-block faq-index-block" aria-labelledby="faq-index-title">
+                    <div class="side-head">
+                        <h2 class="side-title" id="faq-index-title">{_"PAGE_TOC_TITLE"}</h2>
+                    </div>
+
+                    <ol class="toc faq-index">
+                        <li n:foreach="$qa as $id => $value">
+                            <a href="#faq{$id + 1}">{$value["questionText"]}</a>
+                        </li>
+                    </ol>
+                </nav>
+
+                <section class="side-block" aria-labelledby="faq-help-title">
+                    <div class="side-head">
+                        <h2 class="side-title" id="faq-help-title">{_"FAQ_HELP_TITLE"}</h2>
+                    </div>
+
+                    <ol class="howto">
+                        <li>
+                            <span class="howto-icon" aria-hidden="true">{icon("headset")}</span>
+                            <div>
+                                <p class="howto-title">{_"PAGE_HELP_STAFF"}</p>
+                                <a class="howto-link mono" href="ts3server://{$config["query_displayip"]|escapeUrl}">{$config["query_displayip"]}</a>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="howto-icon" aria-hidden="true">{icon("book-open-text")}</span>
+                            <div>
+                                <p class="howto-title">{_"FAQ_HELP_RULES"}</p>
+                                <a class="howto-link" href="rules.php">{_"NAV_RULES"}{icon("arrow-right", "i-sm")}</a>
+                            </div>
+                        </li>
+                    </ol>
+
+                    {* Who could answer right now (faq.php); left out when admin status is off or TeamSpeak is unreachable.
+                       The count and the live dot are only the people who are not away; the away ones get their
+                       own row with the home page's "away" state *}
+                    <div n:if="$staff !== null" n:class="faq-staff, $staff['online'] ? is-online">
+                        <p class="faq-staff-head">
+                            <span>{_"FAQ_STAFF_ONLINE"}</span>
+                            <span class="faq-staff-count tabular">{count($staff["online"])}</span>
+                        </p>
+
+                        {if $staff["online"] || $staff["away"]}
+                            {foreach ["online", "away"] as $state}
+                                {continueIf !$staff[$state]}
+                                {var $people = $staff[$state]}
+                                {var $names = implode(", ", $people)}
+                                <p n:class="faq-staff-people, $state === 'away' ? is-away">
+                                    <span class="avatar-stack" aria-hidden="true">
+                                        {foreach array_slice($people, 0, 5) as $name}
+                                            {avatar($name)}
+                                        {/foreach}
+                                        <span n:if="count($people) > 5" class="avatar avatar-more">+{count($people) - 5}</span>
+                                    </span>
+                                    <span class="faq-staff-names" title="{$names}">{$names}</span>
+                                    <span n:if="$state === 'away'" class="member-state">{_"ADMIN_STATUS_AWAY"}</span>
+                                </p>
+                            {/foreach}
+                        {else}
+                            <p class="side-note">{_"FAQ_STAFF_NONE"}</p>
+                        {/if}
+                    </div>
+                </section>
+            </div>
+        </aside>
     </div>
 {/block}
 
 {block footerbottom}
     <script>
         var FAQ_LANG = {
+            copy_link: {_"FAQ_COPY_LINK"},
             copy_success: {_"FAQ_COPY_LINK_SUCCESS"},
-            copy_error: {_"FAQ_COPY_LINK_ERROR"}
+            copy_error: {_"FAQ_COPY_LINK_ERROR"},
+            count: {_"FAQ_COUNT"},
+            count_found: {_"FAQ_COUNT_FOUND"},
+            search_empty: {_"FAQ_SEARCH_EMPTY"}
         }
     </script>
     {$tplutils::includeScript("js/faq.js", true)}

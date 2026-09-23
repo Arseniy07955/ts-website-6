@@ -1,19 +1,12 @@
 <?php if (!defined("__TSWEBSITE_VERSION")) die("Direct access not allowed"); ?>
 
-<?php if(file_exists(__CONFIG_FILE)) { ?>
-    <div class="alert alert-danger text-center" role="alert">
-        dbconfig.php file found! TS-website might have already been installed.
-        If you proceed, you will lose data!
-    </div>
-<?php } ?>
-
-<div class="modal" tabindex="-1" role="dialog" id="dev-release-notice">
+<div class="modal fade" tabindex="-1" role="dialog" id="dev-release-notice" aria-labelledby="dev-release-notice-title">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Welcome to the development version of TS-website 2!</h5>
+                <h2 class="modal-title" id="dev-release-notice-title">Welcome to the development version of TS-website 2</h2>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                    <?= installerIcon("x") ?>
                 </button>
             </div>
             <div class="modal-body">
@@ -36,7 +29,7 @@
 
                 <p><b>Things that you might not like:</b></p>
 
-                <ul>
+                <ul class="mb-0">
                     <li class="mb-2">
                         <b>There is NO admin panel</b><br>
                         Configure it by modifying files and values in the database
@@ -48,7 +41,7 @@
                     <li>
                         <b>You might find bugs and problems</b><br>
                         If you do, please
-                        <a href="https://github.com/Wruczek/ts-website/issues" target="_blank">create an issue</a>
+                        <a href="https://github.com/Wruczek/ts-website/issues" target="_blank" rel="noopener">create an issue</a>
                         on GitHub
                     </li>
                 </ul>
@@ -60,13 +53,13 @@
     </div>
 </div>
 
-<div class="modal" tabindex="-1" role="dialog" id="metrics-info">
+<div class="modal fade" tabindex="-1" role="dialog" id="metrics-info" aria-labelledby="metrics-info-title">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Metrics send by TS-website</h5>
+                <h2 class="modal-title" id="metrics-info-title">Metrics sent by TS-website</h2>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+                    <?= installerIcon("x") ?>
                 </button>
             </div>
             <div class="modal-body">
@@ -89,7 +82,7 @@
 
                 <p><b>Data sent by TS-website:</b></p>
 
-                <ul>
+                <ul class="mb-0">
                     <li class="mb-1">
                         Version of TS-website and PHP
                     </li>
@@ -102,76 +95,111 @@
                     <li class="mb-1">
                         Basic OS info (type, version, architecture)
                     </li>
-                    <li class="mb-1">
+                    <li>
                         TeamSpeak server info (version, build number, host OS name, slot count,
                         are you using serveradmin for query)
                     </li>
                 </ul>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <h4 class="card-title text-center mb-0">Welcome to TS-website Installer!</h4>
+<header class="installer-head reveal">
+    <?= $stepChip ?>
+    <h1 class="page-title">Welcome to TS-website</h1>
+    <p class="page-sub">This wizard will guide you through the installation, step by step.</p>
+</header>
 
-        <p class="card-text text-center text-muted font-italic mb-5">
-            Version <?= __TSWEBSITE_VERSION ?> (<?= __TSWEBSITE_COMMIT ?>)
+<div class="installer-body">
+    <?php // The requirements check touches an empty dbconfig.php, only a filled one means an earlier install ?>
+    <?php if(file_exists(__CONFIG_FILE) && filesize(__CONFIG_FILE) > 0) { ?>
+        <div class="alert alert-danger has-icon reveal" style="--i: 1" role="alert">
+            <?= installerIcon("warning-circle", "alert-icon") ?>
+            <code>dbconfig.php</code> already exists, so TS-website might have been installed before.
+            If you continue, you will lose its data.
+        </div>
+    <?php } ?>
+
+    <noscript>
+        <div class="alert alert-warning has-icon" role="alert">
+            <?= installerIcon("warning-circle", "alert-icon") ?>
+            Please enable JavaScript before continuing.
+        </div>
+    </noscript>
+
+    <div class="reveal" style="--i: 1">
+        <p>
+            Version <?= htmlspecialchars(__TSWEBSITE_VERSION) ?> (<?= htmlspecialchars(__TSWEBSITE_COMMIT) ?>).
+            If you run into any problems, check the
+            <a href="https://github.com/Wruczek/ts-website/wiki" target="_blank" rel="noopener">wiki</a>.
         </p>
-
-        <p class="card-text">This wizard will guide you through the installation process of TS-website.</p>
-        <p class="card-text text-danger" id="hidejs">Please enable Javascript before continuing!</p>
-        <p class="card-text">
-            If you encounter any problems please make sure you check the
-            <a href="https://github.com/Wruczek/ts-website/wiki" target="_blank">wiki</a>.
-        </p>
-        <p class="card-text">Go to the next step whenever you are ready!</p>
-
-        <form method="post" action="?step=<?= $stepNumber + 1 ?>">
-            <div class="custom-control custom-checkbox">
-                <input type="checkbox" class="custom-control-input" id="allow-metrics-checkbox" name="allow-metrics-checkbox" checked>
-                <label class="custom-control-label" for="allow-metrics-checkbox">
-                    Send one-time statistics to help improve TS-website
-                    <a href="#" data-toggle="modal" data-target="#metrics-info">(learn more)</a>
-                </label>
-            </div>
-
-            <div class="custom-control custom-checkbox">
-                <input type="checkbox" class="custom-control-input" id="accept-license-checkbox" name="accept-license-checkbox" required>
-                <label class="custom-control-label" for="accept-license-checkbox">
-                    I read and accept the <a href="https://github.com/Wruczek/ts-website/blob/2.0/LICENSE.txt" target="_blank">license</a>
-                </label>
-            </div>
-
-            <button id="submitform" type="submit" style="display: none"></button>
-        </form>
     </div>
-    <div class="card-footer">
-        <a id="nextbutton" href="#" class="btn btn-primary float-right disabled" style="display: none">
-            Start <i class="fas fa-chevron-right"></i>
-        </a>
-    </div>
+
+    <form method="post" action="?step=<?= $stepNumber + 1 ?>" class="reveal" style="--i: 2">
+        <div class="custom-control custom-checkbox mt-4">
+            <input type="checkbox" class="custom-control-input" id="allow-metrics-checkbox" name="allow-metrics-checkbox" checked>
+            <label class="custom-control-label" for="allow-metrics-checkbox">
+                Send one-time statistics to help improve TS-website
+                (<a href="#" data-toggle="modal" data-target="#metrics-info">learn more</a>)
+            </label>
+        </div>
+
+        <div class="custom-control custom-checkbox">
+            <input type="checkbox" class="custom-control-input" id="accept-license-checkbox" name="accept-license-checkbox" required>
+            <label class="custom-control-label" for="accept-license-checkbox">
+                I read and accept the <a href="https://github.com/Wruczek/ts-website/blob/2.0/LICENSE.txt" target="_blank" rel="noopener">license</a>
+            </label>
+        </div>
+
+        <div class="installer-actions">
+            <button id="nextbutton" type="submit" class="btn btn-primary">
+                Start<?= installerIcon("arrow-right", "i-arrow") ?>
+            </button>
+        </div>
+    </form>
 </div>
+
+<?php ob_start(); ?>
+<section class="side-block reveal" style="--i: 1" aria-labelledby="notes-title">
+    <div class="side-head">
+        <h2 class="side-title" id="notes-title">You will need</h2>
+    </div>
+
+    <ul class="howto">
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("database") ?></span>
+            <div>
+                <p class="howto-title">A MySQL or MariaDB database</p>
+                <p class="howto-sub">Its address, a user with a password and the name of the database</p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("key") ?></span>
+            <div>
+                <p class="howto-title">Query access to the TeamSpeak server</p>
+                <p class="howto-sub">TeamSpeak 3: a query login. TeamSpeak 6: an SSH login or a WebQuery API key</p>
+            </div>
+        </li>
+        <li>
+            <span class="howto-icon" aria-hidden="true"><?= installerIcon("folder-simple") ?></span>
+            <div>
+                <p class="howto-title">Write access to <code>private</code></p>
+                <p class="howto-sub">The installer saves the database settings and the cache there</p>
+            </div>
+        </li>
+    </ul>
+</section>
+<?php $pageNotes = ob_get_clean(); ?>
 
 <script>
     $("#dev-release-notice").modal("show")
 
-    $("#hidejs").css("display", "none");
-    $("#nextbutton").css("display", "inline-block");
-
-    $("#nextbutton").click(function () {
-        $("#submitform").click();
-    });
-
+    // Start stays unavailable until the license is accepted; without JavaScript "required" does the same
     $("#accept-license-checkbox").change(function () {
-        if (this.checked) {
-            $("#nextbutton").removeClass("disabled");
-        } else {
-            $("#nextbutton").addClass("disabled");
-        }
-    });
+        $("#nextbutton").prop("disabled", !this.checked)
+    }).trigger("change")
 </script>

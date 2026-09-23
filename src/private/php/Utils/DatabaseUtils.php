@@ -39,6 +39,10 @@ class DatabaseUtils {
 
                 $db = new Medoo($config);
             } catch (\Exception $e) {
+                if (!headers_sent()) {
+                    http_response_code(503);
+                }
+
                 TemplateUtils::i()->renderErrorTemplate("DB error", "Connection to database failed", $e->getMessage());
                 exit;
             }

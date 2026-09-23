@@ -194,6 +194,11 @@ class Auth {
     public static function loginUser(int $cldbid): bool {
         $clientList = CacheManager::i()->getClientList();
 
+        // The TeamSpeak server is unreachable, the client list cannot be checked
+        if ($clientList === null) {
+            return false;
+        }
+
         foreach ($clientList as $client) {
             if ($client["client_database_id"] === $cldbid) {
                 $_SESSION["tsuser"]["uid"] = (string) $client["client_unique_identifier"];

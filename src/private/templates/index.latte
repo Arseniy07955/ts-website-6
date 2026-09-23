@@ -1,91 +1,309 @@
 {extends "body.latte"}
 {var $title = __get("HOME_TITLE")}
+{var $isHome = $currentPage === 1}
+{var $flushPage = $currentPage === 1}
 
 {block content}
-    <div class="card card-titleblock card-accent">
-        <div class="card-header">
-            <i class="far fa-newspaper"></i>{_"HOME_PANEL_TITLE"}
-        </div>
-    </div>
+    {if $currentPage === 1}
+        {* Live server: numbers are filled in and refreshed by js/status.js *}
+        <section class="hero" data-server-status data-state="loading" aria-labelledby="hero-title">
+            <div class="hero-main reveal">
+                <h1 class="sr-only" id="hero-title">{$config["website_title"]}</h1>
 
-    {if $newsList === null || $newsList === false}
-        {include "utils/data-problem.latte", message => __get("CANNOT_GET_DATA", "news")}
-    {elseif $newsCount === 0}
-        <div class="alert alert-info text-center" role="alert">
-            {_"HOME_EMPTY"}
-        </div>
-    {elseif !$newsList}
-        <div class="alert alert-danger" role="alert">
-            <i class="fas fa-exclamation-circle"></i>{_"HOME_INVALID_PAGE"}
-        </div>
-    {else}
-        {foreach $newsList as $news}
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5>
-                        {ifset $news["link"]}
-                            <a href="{$news["link"]}" n:attr="target => $news['external'] ? '_blank'">
-                                {$news["title"]|noescape}
-                            </a>
-                        {else}
-                            {$news["title"]|noescape}
-                        {/ifset}
-                    </h5>
-                    <div>
-                        {strtotime($news["added"])|fuzzyDateAbbr}
-                        {if $news["edited"] !== null}
-                            <i class="fas fa-pencil-alt mr-0 ml-1 news-edited"
-                                data-toggle="tooltip"
-                                data-translation="{_"HOME_NEWS_EDITED"}"
-                                n:attr="data-timestamp => strtotime($news['edited'])"></i>
-                        {/if}
-                    </div>
+                <p class="live-state">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <span class="when-loading">{_"SERVER_STATE_LOADING"}</span>
+                    <span class="when-online">{_"SERVER_STATE_ONLINE"}</span>
+                    <span class="when-offline">{_"SERVER_STATE_OFFLINE"}</span>
+                </p>
+
+                <p class="hero-server-name when-online" data-status="name"></p>
+
+                <p class="hero-count when-online-or-loading" data-status-count aria-live="polite">0</p>
+                <p class="hero-offline-title when-offline">{_"SERVER_STATE_OFFLINE"}</p>
+
+                <p class="hero-caption">
+                    <span class="when-loading">&nbsp;</span>
+                    <span class="when-online">{_"HOME_ONLINE_OF", '<span class="tabular" data-status="maxClients"></span>'}</span>
+                    <span class="when-offline">{_"STATUS_ERROR"}</span>
+                </p>
+
+                <div class="level when-online-or-loading" data-status-level role="meter" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-label="{_"STATUS_CLIENTS_ONLINE"|label}">
+                    <span class="level-fill"></span>
                 </div>
-                <div class="card-body">
-                    <p class="card-text">{$news["description"]|noescape}</p>
+
+                <div class="hero-actions">
+                    <a class="btn btn-primary btn-lg" href="ts3server://{$config["query_displayip"]|escapeUrl}">
+                        {_"CONNECT_BUTTON"}{icon("arrow-right", "i-arrow")}
+                    </a>
+
+                    <button type="button" class="address" data-copy="{$config["query_displayip"]}" aria-label="{_"COPY_ADDRESS"}: {$config["query_displayip"]}">
+                        <span>{$config["query_displayip"]}</span>
+                        {icon("copy")}
+                        <span class="address-feedback" aria-live="polite">{_"COPIED"}</span>
+                    </button>
                 </div>
             </div>
-        {/foreach}
 
-        {* Pagination logic *}
-        {* show the pagination only if we have more than 1 page *}
-        <div n:if="$pageCount > 1" class="text-center mt-4">
-            <nav>
-                <ul class="pagination justify-content-center">
-                    {* If we are not on the first page, show the "previous page" button *}
-                    {if $currentPage !== 1}
-                        {* If the previous page is page #1, link directly to the index, otherwise to "index?page=id" *}
-                        <li class="page-item">
-                            <a class="page-link light-hover" href="{if $currentPage -1 !== 1}?page={$currentPage - 1}{else}.{/if}" aria-label="{_"HOME_PREVIOUS_NEWS"}">
-                                <span aria-hidden="true"><i class="fas fa-chevron-left mr-0"></i></span>
-                                <span class="sr-only">{_"HOME_PREVIOUS_NEWS"}</span>
-                            </a>
-                        </li>
-                    {/if}
+            <div class="hero-side reveal" style="--i: 1" data-server-status data-state="loading">
+                <div class="side-head">
+                    <h2 class="side-title">{_"HOME_WHO_ONLINE"}</h2>
+                    <a class="block-link" href="viewer.php">{_"HOME_ALL_CHANNELS"}{icon("arrow-right")}</a>
+                </div>
 
-                    {* Loop through the pages to be displayed. Display 5 buttons: *}
-                    {* page -2, page -1, current page, page + 1, page + 2 *}
-                    {* using max / min, limit the range to the minimum: 1, and maximum: total number of pages *}
-                    {* so that we never show page 0 or -1, and also never show more pages that we actually have *}
-                    {* Shot out from Wruczek to anyone reading this xD *}
-                    {foreach range(max($currentPage - 2, 1), min($currentPage + 2, $pageCount)) as $page}
-                        {* If the previous page is page #1, link directly to "/news", otherwise to "/news/PageNum" *}
-                        <li class="page-item{if $page === $currentPage} active{/if}">
-                            <a class="page-link light-hover" href="{if $page !== 1}?page={$page}{else}.{/if}">{$page}</a>
+                {if $occupiedChannels === null}
+                    <p class="side-note">{_"STATUS_ERROR"}</p>
+                {elseif !$onlinePeople}
+                    <p class="side-note">{_"HOME_NOBODY_ONLINE"}</p>
+                {else}
+                    {var $wallLimit = 35}
+                    <ul class="avatar-wall">
+                        <li n:foreach="array_slice($onlinePeople, 0, $wallLimit) as $i => $person" style="--i: {$i}">
+                            <span class="avatar-wrap" tabindex="0" data-toggle="tooltip" title="{$person["name"]} · {$person["channel"]}">
+                                {avatar($person["name"], "avatar-lg")}
+                                <span class="sr-only">{$person["name"]}, {$person["channel"]}</span>
+                            </span>
                         </li>
-                    {/foreach}
+                        <li n:if="count($onlinePeople) > $wallLimit" style="--i: {$wallLimit}">
+                            <a class="avatar avatar-lg avatar-more" href="viewer.php">+{count($onlinePeople) - $wallLimit}</a>
+                        </li>
+                    </ul>
+                {/if}
 
-                    {* If we are not on the last page, show the "next page" button *}
-                    {if $currentPage !== $pageCount}
-                        <li class="page-item">
-                            <a class="page-link light-hover" href="?page={$currentPage + 1}" aria-label="{_"HOME_NEXT_NEWS"}">
-                                <span aria-hidden="true"><i class="fas fa-chevron-right mr-0"></i></span>
-                                <span class="sr-only">{_"HOME_NEXT_NEWS"}</span>
-                            </a>
-                        </li>
-                    {/if}
+                <dl class="side-stats when-online">
+                    <div n:if="$occupiedChannels !== null">
+                        <dt>{_"HOME_BUSY_CHANNELS"}</dt>
+                        <dd class="tabular">{$occupiedTotal}<span> / <span data-status="channelCount"></span></span></dd>
+                    </div>
+                    <div>
+                        <dt>{_"HOME_FREE_SLOTS"}</dt>
+                        <dd class="tabular" data-status="freeSlots"></dd>
+                    </div>
+                    <div>
+                        <dt>{_"STATUS_RESERVED_SHORT"}</dt>
+                        <dd class="tabular" data-status="reservedSlots"></dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        <section class="stat-strip" data-server-status data-state="loading" aria-label="{_"HOME_SERVER_TITLE"}">
+            <dl class="cells">
+                <div class="cell">
+                    <dt>{icon("trophy", "i-sm")}{_"STATUS_TOP_ONLINE"|label}</dt>
+                    <dd data-status="onlineRecord" data-toggle="tooltip" data-translation="{_"STATUS_TOP_ONLINE_DESC"}"><span class="skeleton"></span></dd>
+                    <dd class="cell-sub" data-status="onlineRecordDate"></dd>
+                </div>
+                <div class="cell">
+                    <dt>{icon("clock", "i-sm")}{_"STATUS_UPTIME"|label}</dt>
+                    <dd data-status="uptime"><span class="skeleton"></span></dd>
+                </div>
+                <div class="cell">
+                    <dt>{icon("cell-signal-high", "i-sm")}{_"STATUS_PING"|label}</dt>
+                    <dd data-status="ping"><span class="skeleton"></span></dd>
+                </div>
+                <div class="cell">
+                    <dt>{icon("wave-sine", "i-sm")}{_"STATUS_PACKETLOSS"|label}</dt>
+                    <dd data-status="packetloss"><span class="skeleton"></span></dd>
+                </div>
+                <div class="cell">
+                    <dt>{icon("hard-drives", "i-sm")}{_"STATUS_VERSION"|label}</dt>
+                    <dd data-status="version"><span class="skeleton"></span></dd>
+                    <dd class="cell-sub" data-status="platform"></dd>
+                </div>
+            </dl>
+        </section>
+
+        {if $occupiedChannels}
+            <section class="section js-scroll-reveal" aria-labelledby="channels-title">
+                <div class="section-head">
+                    <h2 class="section-title" id="channels-title">{_"HOME_WHERE_PEOPLE"}</h2>
+                    <a class="block-link" href="viewer.php">
+                        {if $occupiedTotal > count($occupiedChannels)}
+                            {_"HOME_MORE_CHANNELS", $occupiedTotal - count($occupiedChannels)}
+                        {else}
+                            {_"HOME_ALL_CHANNELS"}
+                        {/if}
+                        {icon("arrow-right")}
+                    </a>
+                </div>
+
+                <ul class="channel-list">
+                    <li class="channel-row" n:foreach="$occupiedChannels as $channel">
+                        <a class="channel-link" href="viewer.php">
+                            <span class="channel-name">
+                                {if $channel["parents"]}
+                                    <span class="channel-parent">{end($channel["parents"])}</span>
+                                {/if}
+                                {$channel["name"]}
+                            </span>
+
+                            <span class="channel-people">
+                                <span class="avatar-stack" aria-hidden="true">
+                                    {foreach array_slice($channel["clients"], 0, 5) as $nickname}
+                                        {avatar($nickname)}
+                                    {/foreach}
+                                </span>
+                                <span class="channel-names">{implode(", ", $channel["clients"])}</span>
+                            </span>
+
+                            <span class="channel-count tabular">{count($channel["clients"])}</span>
+                        </a>
+                    </li>
                 </ul>
-            </nav>
-        </div>
+            </section>
+        {/if}
     {/if}
+
+    <div n:class="$currentPage === 1 ? 'split js-scroll-reveal'">
+        <section n:class="$currentPage === 1 ? 'split-main news'" aria-labelledby="news-title">
+            <div class="section-head">
+                {if $currentPage === 1}
+                    <h2 class="section-title" id="news-title">{_"HOME_PANEL_TITLE"}</h2>
+                {else}
+                    <h1 class="page-title" id="news-title">{_"HOME_PANEL_TITLE"}</h1>
+                {/if}
+            </div>
+
+            {if $newsList === null || $newsList === false}
+                {include "utils/data-problem.latte", message => __get("CANNOT_GET_DATA", "news")}
+            {elseif $newsCount === 0}
+                <div class="empty-state">
+                    {icon("newspaper")}
+                    <p class="empty-state-title">{_"HOME_EMPTY"}</p>
+                </div>
+            {elseif !$newsList}
+                <div class="alert alert-danger has-icon" role="alert">
+                    {icon("warning-circle", "alert-icon")}
+                    {_"HOME_INVALID_PAGE"}
+                </div>
+
+                <a class="btn btn-secondary" href=".">{_"HOME_FIRST_PAGE"}</a>
+            {else}
+                <div class="posts">
+                    <article n:foreach="$newsList as $news" n:class="post, $iterator->first && $currentPage === 1 ? post--lead">
+                        <div class="post-meta">
+                            {icon("calendar-blank", "i-sm")}
+                            {strtotime($news["added"])|fuzzyDateAbbr}
+
+                            {if $news["edited"] !== null}
+                                <span class="post-edited news-edited"
+                                      tabindex="0"
+                                      data-toggle="tooltip"
+                                      data-translation="{_"HOME_NEWS_EDITED"}"
+                                      n:attr="data-timestamp => strtotime($news['edited'])">
+                                    {icon("pencil-simple", "i-sm")}{_"HOME_EDITED_LABEL"}
+                                </span>
+                            {/if}
+                        </div>
+
+                        <h3 class="post-title">
+                            {ifset $news["link"]}
+                                <a href="{$news["link"]}" n:attr="target => $news['external'] ? '_blank', rel => $news['external'] ? 'noopener'">
+                                    {$news["title"]|noescape}{if $news['external']}{icon("arrow-up-right")}{/if}
+                                </a>
+                            {else}
+                                {$news["title"]|noescape}
+                            {/ifset}
+                        </h3>
+
+                        <div class="prose">{$news["description"]|noescape}</div>
+                    </article>
+                </div>
+
+                {* Pagination: only when there is more than one page. Page 1 lives at the index, the others at "?page=N" *}
+                <nav n:if="$pageCount > 1" class="pager" aria-label="{_"HOME_PAGINATION"}">
+                    {if $currentPage !== 1}
+                        <a class="btn btn-secondary btn-sm" rel="prev" href="{if $currentPage - 1 !== 1}?page={$currentPage - 1}{else}.{/if}">
+                            {icon("arrow-left")}{_"HOME_PREVIOUS_NEWS"}
+                        </a>
+                    {else}
+                        <span class="btn btn-secondary btn-sm" aria-disabled="true">{icon("arrow-left")}{_"HOME_PREVIOUS_NEWS"}</span>
+                    {/if}
+
+                    {* Up to 5 page links around the current one, never below 1 or above the last page *}
+                    <ul class="pager-pages pagination">
+                        {foreach range(max($currentPage - 2, 1), min($currentPage + 2, $pageCount)) as $page}
+                            <li n:class="page-item, $page === $currentPage ? active">
+                                <a class="page-link" href="{if $page !== 1}?page={$page}{else}.{/if}"
+                                   n:attr="aria-current => $page === $currentPage ? 'page'">{$page}</a>
+                            </li>
+                        {/foreach}
+                    </ul>
+
+                    {if $currentPage !== $pageCount}
+                        <a class="btn btn-secondary btn-sm" rel="next" href="?page={$currentPage + 1}">
+                            {_"HOME_NEXT_NEWS"}{icon("arrow-right", "i-arrow")}
+                        </a>
+                    {else}
+                        <span class="btn btn-secondary btn-sm" aria-disabled="true">{_"HOME_NEXT_NEWS"}{icon("arrow-right")}</span>
+                    {/if}
+                </nav>
+            {/if}
+        </section>
+
+        {if $currentPage === 1}
+            <aside class="split-side">
+                {ifset $adminStatus}
+                    {var $offlineHiddenByDefault = $config["adminstatus_offlinehiddenbydefault"]}
+                    <section class="side-block" aria-labelledby="team-title">
+                        <div class="side-head">
+                            <h2 class="side-title" id="team-title">{_"ADMIN_STATUS_PANEL_TITLE"}</h2>
+
+                            {if $adminStatus !== false}
+                                <span>
+                                    <button type="button" class="btn btn-ghost btn-icon btn-xs" data-adminstatusoffline="hide"
+                                            data-toggle="tooltip" title="{_"ADMIN_STATUS_HIDE_OFFLINE_TIP"}" aria-label="{_"ADMIN_STATUS_HIDE_OFFLINE_TIP"}"
+                                            n:attr="style => $offlineHiddenByDefault ? 'display: none'">{icon("eye")}</button>
+                                    <button type="button" class="btn btn-ghost btn-icon btn-xs" data-adminstatusoffline="show"
+                                            data-toggle="tooltip" title="{_"ADMIN_STATUS_SHOW_OFFLINE_TIP"}" aria-label="{_"ADMIN_STATUS_SHOW_OFFLINE_TIP"}"
+                                            n:attr="style => !$offlineHiddenByDefault ? 'display: none'">{icon("eye-slash")}</button>
+                                </span>
+                            {/if}
+                        </div>
+
+                        {if $adminStatus !== false}
+                            {include "admin-status.latte",
+                                data => $adminStatus["data"],
+                                format => $adminStatus["format"],
+                                defaultHide => $offlineHiddenByDefault
+                            }
+                        {else}
+                            <p class="side-note">{_"ADMIN_STATUS_ERROR"}</p>
+                        {/if}
+                    </section>
+                {/ifset}
+
+                <section class="side-block" aria-labelledby="howto-title">
+                    <div class="side-head">
+                        <h2 class="side-title" id="howto-title">{_"HOME_HOWTO_TITLE"}</h2>
+                    </div>
+
+                    <ol class="howto">
+                        <li>
+                            <span class="howto-icon" aria-hidden="true">{icon("headset")}</span>
+                            <div>
+                                <p class="howto-title">{_"HOME_HOWTO_INSTALL"}</p>
+                                <a class="howto-link" href="https://teamspeak.com/downloads/" target="_blank" rel="noopener">teamspeak.com{icon("arrow-up-right", "i-sm")}</a>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="howto-icon" aria-hidden="true">{icon("plugs-connected")}</span>
+                            <div>
+                                <p class="howto-title">{_"HOME_HOWTO_CONNECT"}</p>
+                                <a class="howto-link mono" href="ts3server://{$config["query_displayip"]|escapeUrl}">{$config["query_displayip"]}</a>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="howto-icon" aria-hidden="true">{icon("tag")}</span>
+                            <div>
+                                <p class="howto-title">{_"HOME_HOWTO_GROUPS"}</p>
+                                <a class="howto-link" href="assigner.php">{_"NAV_ASSIGNER"}{icon("arrow-right", "i-sm")}</a>
+                            </div>
+                        </li>
+                    </ol>
+                </section>
+            </aside>
+        {/if}
+    </div>
 {/block}

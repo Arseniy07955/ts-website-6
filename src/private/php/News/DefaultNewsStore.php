@@ -18,7 +18,7 @@ class DefaultNewsStore implements INewsStore {
         $this->db = DatabaseUtils::i()->getDb();
     }
 
-    public function getNewsList(int $limit, int $offset = null): array {
+    public function getNewsList(int $limit, ?int $offset = null): array {
         $options = []; // Medoo: [$offset, $limit]
 
         // If we have both limit and offset
@@ -79,7 +79,7 @@ class DefaultNewsStore implements INewsStore {
         return $this->db->id();
     }
 
-    public function editNews(int $newsId, string $title = null, string $content = null, ?int $addDate = null, ?int $editDate = null): bool {
+    public function editNews(int $newsId, ?string $title = null, ?string $content = null, ?int $addDate = null, ?int $editDate = null): bool {
         $data = [];
 
         if ($title !== null) $data["title"] = $title;

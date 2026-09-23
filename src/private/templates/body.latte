@@ -4,34 +4,90 @@ $tplutils = Wruczek\TSWebsite\Utils\TemplateUtils::i();
 $auth = Wruczek\TSWebsite\Auth::class;
 $userlangcode = $userLanguage->getLanguageCode();
 $navActiveIndex = isset($navActiveIndex) ? (int) $navActiveIndex : 0;
+$isHome = isset($isHome) && $isHome;
+$themeDefault = $config["theme_default"] ?? "dark";
+$themeDefault = in_array($themeDefault, ["dark", "light", "auto"], true) ? $themeDefault : "dark";
+$navItems = [
+    1 => ["viewer.php", "NAV_VIEWER", "tree-view"],
+    2 => ["assigner.php", "NAV_ASSIGNER", "tag"],
+    3 => ["bans.php", "NAV_BANS", "prohibit"],
+    4 => ["rules.php", "NAV_RULES", "book-open-text"],
+    5 => ["faq.php", "NAV_FAQ", "question"],
+];
 }<!DOCTYPE html>
-<html n:attr="lang => $userlangcode">
+<html n:attr="lang => $userlangcode" data-theme="dark" data-theme-default="{$themeDefault}">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="generator" content="TS-website {\__TSWEBSITE_VERSION} by Wruczek / https://github.com/Wruczek/ts-website">
     <meta name="csrf-token" content="{$csrfToken}">
-    <link rel="shortcut icon" href="img/icons/defaulticon-16.png">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#0f0f10">
+    <link rel="icon" type="image/png" sizes="32x32" href="img/icons/defaulticon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="img/icons/defaulticon-16.png">
+    <link rel="apple-touch-icon" href="img/icons/defaulticon-256.png">
 
     <!-- TODO make it use the language variable "WEBSITE_TITLE" after the ACP update -->
     <title>{$title} | {$config["website_title"]}</title>
 
+    <script>
+        // Resolve the theme before the first paint to avoid a flash of the wrong one
+        (function (root) {
+            root.classList.add("js")
+
+            // A page transition can be skipped (fast clicks, reloads); that is not an error
+            function quiet(transition) {
+                transition.ready.catch(function () {})
+                transition.finished.catch(function () {})
+                transition.updateCallbackDone.catch(function () {})
+            }
+
+            window.addEventListener("pageswap", function (e) {
+                e.viewTransition && quiet(e.viewTransition)
+            })
+
+            // Pages entered through a view transition skip their own entrance animation
+            window.addEventListener("pagereveal", function (e) {
+                if (e.viewTransition) {
+                    root.classList.add("page-transition")
+                    quiet(e.viewTransition)
+                }
+            })
+
+            var mode = root.getAttribute("data-theme-default")
+            try { mode = localStorage.getItem("tswebsite_theme") || mode } catch (e) {}
+            if (mode === "auto") {
+                mode = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"
+            }
+            root.setAttribute("data-theme", mode === "light" ? "light" : "dark")
+        })(document.documentElement)
+    </script>
+
+    <!-- Hold the first frame until the page content is parsed, so page transitions have something to show -->
+    <link rel="expect" href="#main-end" blocking="render">
+    <link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
+    {if in_array(explode("-", $userlangcode)[0], ["ru", "uk", "be", "bg", "bs"], true)}
+        <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+    {/if}
+
     <!-- Bootstrap 4.6.0 -->
     {$tplutils::includeStylesheet("{cdnjs}/twitter-bootstrap/4.6.0/css/bootstrap.min.css", "sha256-T/zFmO5s/0aSwc6ics2KLxlfbewyRz6UNw1s3Ppf5gE=")}
 
-    <!-- FontAwesome CSS 5.15.3 -->
+    <!-- FontAwesome CSS 5.15.3, kept for icons used in admin-written content -->
     {$tplutils::includeStylesheet("{cdnjs}/font-awesome/5.15.3/css/all.min.css", "sha256-2H3fkXt6FEmrReK448mDVGKb3WW2ZZw35gI7vqHOE4Y=")}
 
     <!-- DataTables 1.10.21 -->
     {$tplutils::includeStylesheet("{cdnjs}/datatables/1.10.21/css/dataTables.bootstrap4.min.css", "sha256-ugpqzk9NhK3S2sVpMgSrIin1AzsJMlqUIMOCXyzPaL8=")}
 
-    <!-- Internal scripts -->
+    <!-- Internal styles -->
     {$tplutils::includeStylesheet("css/flags/famfamfam-flags.min.css", true)}
-    {$tplutils::includeStylesheet("css/style.css", true)}
-    {$tplutils::includeStylesheet("css/loader.css", true)}
-    {$tplutils::includeStylesheet("css/cookiealert.css", true)}
-    {$tplutils::includeStylesheet("css/themes/dark.css", true)}
+    {$tplutils::includeStylesheet("css/tsw.css", true)}
+    {$tplutils::includeStylesheet("css/pages/viewer.css", true)}
+    {$tplutils::includeStylesheet("css/pages/bans.css", true)}
+    {$tplutils::includeStylesheet("css/pages/assigner.css", true)}
+    {$tplutils::includeStylesheet("css/pages/faq.css", true)}
+    {$tplutils::includeStylesheet("css/pages/login.css", true)}
 
     {if __DEV_MODE}
         <!-- Dev script - added when dev mode is on -->
@@ -39,6 +95,8 @@ $navActiveIndex = isset($navActiveIndex) ? (int) $navActiveIndex : 0;
     {/if}
 </head>
 <body n:attr="class => 'lang ' . $userlangcode">
+
+<a class="skip-link" href="#main">{_"SKIP_TO_CONTENT"}</a>
 
 <noscript>
     <div class="alert alert-danger noscript-alert bottom-error-alert" role="alert">
@@ -54,123 +112,213 @@ $navActiveIndex = isset($navActiveIndex) ? (int) $navActiveIndex : 0;
     {include "utils/modal-login.latte"}
 {/if}
 
-<nav id="main-navbar" class="navbar navbar-expand-lg fixed-top nav-fix-scroll navbar-dark bg-primary">
-    <div class="container">
-        <a class="navbar-brand" href=".">
-            <img src="img/icons/defaulticon-64.png" width="32" height="32" class="d-inline-block align-top mr-1" alt="Brand image">
-            {$config["nav_brand"]}
+<div class="frame">
+
+<header class="site-header" id="main-navbar">
+    <div class="site-header-inner">
+        <a class="brand" href=".">
+            <img src="img/icons/defaulticon-64.png" width="26" height="26" alt="">
+            <span class="brand-name">{$config["nav_brand"]}</span>
         </a>
 
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainNavbarNavDropdown"
-                aria-controls="mainNavbarNavDropdown" aria-expanded="false" aria-label="{_"NAV_TOGGLE"}">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="mainNavbarNavDropdown">
-            <ul class="navbar-nav">
-                <li class="nav-item{if $navActiveIndex === 1} active{/if}">
-                    <a class="nav-link" href="viewer.php"><i class="fas fa-eye"></i>{_"NAV_VIEWER"}</a>
-                </li>
-                <li class="nav-item{if $navActiveIndex === 2} active{/if}">
-                    <a class="nav-link" href="assigner.php"><i class="fas fa-gamepad"></i>{_"NAV_ASSIGNER"}</a>
-                </li>
-                <li class="nav-item{if $navActiveIndex === 3} active{/if}">
-                    <a class="nav-link" href="bans.php"><i class="fas fa-ban"></i>{_"NAV_BANS"}</a>
-                </li>
-                <li class="nav-item{if $navActiveIndex === 4} active{/if}">
-                    <a class="nav-link" href="rules.php"><i class="fas fa-book"></i>{_"NAV_RULES"}</a>
-                </li>
-                <li class="nav-item{if $navActiveIndex === 5} active{/if}">
-                    <a class="nav-link" href="faq.php"><i class="far fa-question-circle"></i>{_"NAV_FAQ"}</a>
-                </li>
-            </ul>
-            <ul class="navbar-nav ml-md-auto">
-
-                {if $auth::isLoggedIn()}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link login-button text-truncate dropdown-toggle" href="#" id="navbarDropdownUser" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            <i class="fas fa-user"></i>{$auth::getNickname()}
-                        </a>
-                            <div class="dropdown-menu" aria-labelledby="navbarDropdownUser">
-                            <button class="dropdown-item logoutUser"><i class="fas fa-sign-out-alt"></i>{_"NAV_ACCOUNT_LOGOUT"}</button>
-                        </div>
-                    </li>
-                {else}
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-openLoginModal><i class="fas fa-sign-in-alt"></i>{_"NAV_ACCOUNT_LOGIN"}</a>
-                    </li>
-                {/if}
-
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownLanguageChooser" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fas fa-language"></i>{$userLanguage->getLanguageNameNative()}
+        <nav class="topnav" aria-label="{_"NAV_MAIN"}">
+            <ul>
+                <li n:foreach="$navItems as $index => $item">
+                    <a href="{$item[0]}"
+                       n:class="topnav-link, $navActiveIndex === $index ? is-active"
+                       n:attr="aria-current => $navActiveIndex === $index ? 'page'">
+                        {_$item[1]}<span n:if="$navActiveIndex === $index" class="nav-underline" aria-hidden="true"></span>
                     </a>
-                    <form method="post" action="api/setlang.php">
-                        {$csrfField}
-                        <input type="hidden" name="return-to" value="{$_SERVER['PHP_SELF']}">
-
-                        <div class="dropdown-menu" aria-labelledby="navbarDropdownLanguageChooser">
-                            <button name="lang" class="dropdown-item{if $lang->getLanguageCode() === $userlangcode} active{/if}"
-                                n:foreach="$languageList as $lang"
-                                n:attr="value => $lang->getLanguageCode(), title => $lang->getLanguageNameEnglish()">
-                                {$lang->getLanguageNameNative()}
-                            </button>
-                        </div>
-                    </form>
                 </li>
             </ul>
+        </nav>
+
+        <div class="site-tools">
+            {* The home page carries its own large connect action *}
+            <a n:if="!$isHome" class="btn btn-primary btn-sm header-connect" href="ts3server://{$config["query_displayip"]|escapeUrl}" aria-label="{_"CONNECT_BUTTON"}">
+                {icon("headset", "header-connect-icon")}<span class="header-connect-label">{_"CONNECT_BUTTON"}</span>
+            </a>
+
+            <div class="dropdown">
+                <button class="btn btn-ghost btn-sm lang-toggle" type="button" id="navbarDropdownLanguageChooser"
+                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                        aria-label="{_"LANGUAGE_LABEL"}: {$userLanguage->getLanguageNameNative()}">
+                    <span class="lang-code">{strtoupper(explode("-", $userlangcode)[0])}</span>
+                    {icon("caret-down", "caret")}
+                </button>
+                <form method="post" action="api/setlang.php" class="dropdown-menu dropdown-menu-right lang-menu" aria-labelledby="navbarDropdownLanguageChooser">
+                    {$csrfField}
+                    <input type="hidden" name="return-to" value="{$_SERVER['PHP_SELF']}">
+                    <button name="lang" type="submit"
+                        n:foreach="$languageList as $lang"
+                        n:class="dropdown-item, $lang->getLanguageCode() === $userlangcode ? active"
+                        n:attr="value => $lang->getLanguageCode(), title => $lang->getLanguageNameEnglish(), lang => $lang->getLanguageCode()">
+                        <span>{$lang->getLanguageNameNative()}</span>
+                        {if $lang->getLanguageCode() === $userlangcode}
+                            {icon("check")}
+                        {else}
+                            <span class="lang-item-code">{$lang->getLanguageCode()}</span>
+                        {/if}
+                    </button>
+                </form>
+            </div>
+
+            {if $auth::isLoggedIn()}
+                <div class="dropdown header-login">
+                    <button class="btn btn-ghost btn-sm user-toggle" type="button" id="navbarDropdownUser"
+                            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <span class="user-name">{$auth::getNickname()}</span>
+                        {icon("caret-down", "caret")}
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdownUser">
+                        <h6 class="dropdown-header">{_"ACCOUNT_SIGNED_IN_AS", $auth::getNickname()}</h6>
+                        <button type="button" class="dropdown-item logoutUser">{icon("sign-out")}{_"NAV_ACCOUNT_LOGOUT"}</button>
+                    </div>
+                </div>
+            {else}
+                <button type="button" class="btn btn-ghost btn-sm header-login" data-openLoginModal>{_"NAV_ACCOUNT_LOGIN"}</button>
+            {/if}
+
+            <button type="button" class="btn btn-ghost btn-icon menu-toggle" aria-expanded="false" aria-controls="mobile-menu" aria-label="{_"NAV_TOGGLE"}">
+                <span class="menu-lines" aria-hidden="true"></span>
+            </button>
         </div>
     </div>
-</nav>
+</header>
 
-<div class="container">
+<div class="mobile-menu" id="mobile-menu" hidden>
+    <nav aria-label="{_"NAV_MAIN"}">
+        <ul class="mobile-nav">
+            <li style="--i: 0">
+                <a href="." n:class="$navActiveIndex === 0 ? is-active" n:attr="aria-current => $navActiveIndex === 0 ? 'page'">{_"HOME_TITLE"}</a>
+            </li>
+            <li n:foreach="$navItems as $index => $item" style="--i: {$index}">
+                <a href="{$item[0]}" n:class="$navActiveIndex === $index ? is-active" n:attr="aria-current => $navActiveIndex === $index ? 'page'">{_$item[1]}</a>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="mobile-menu-section" style="--i: 6">
+        {if $auth::isLoggedIn()}
+            <p class="mobile-menu-label">{_"ACCOUNT_SIGNED_IN_AS", $auth::getNickname()}</p>
+            <button type="button" class="mobile-action logoutUser">{_"NAV_ACCOUNT_LOGOUT"}</button>
+        {else}
+            <button type="button" class="mobile-action" data-openLoginModal>{_"NAV_ACCOUNT_LOGIN"}</button>
+        {/if}
+    </div>
+
+    <div class="mobile-menu-section" style="--i: 7">
+        <p class="mobile-menu-label">{_"LANGUAGE_LABEL"}</p>
+        <form method="post" action="api/setlang.php" class="mobile-langs">
+            {$csrfField}
+            <input type="hidden" name="return-to" value="{$_SERVER['PHP_SELF']}">
+            <button name="lang" type="submit"
+                n:foreach="$languageList as $lang"
+                n:class="$lang->getLanguageCode() === $userlangcode ? is-active"
+                n:attr="value => $lang->getLanguageCode(), lang => $lang->getLanguageCode(), aria-current => $lang->getLanguageCode() === $userlangcode ? 'true'">
+                {$lang->getLanguageNameNative()}
+            </button>
+        </form>
+    </div>
+</div>
+
+<main id="main" n:class="page, !empty($flushPage) ? page--flush" tabindex="-1">
     {ifset $oldestTimestamp}
-        {include "utils/data-problem.latte", message => ("OUTDATED_DATA"|translate,($oldestTimestamp|fuzzyDateAbbr))}
+        {include "utils/data-problem.latte", message => ("OUTDATED_DATA"|translate,($oldestTimestamp|fuzzyDateAbbr)), level => "warning"}
     {/ifset}
 
     {if $tsExceptions}
-        {include "utils/data-problem.latte", message => "We are having trouble communicating with the server. Some parts of the website might not be working as expected."}
+        {include "utils/data-problem.latte", message => ("TS_CONNECTION_PROBLEM"|translate)}
     {/if}
 
-    <div class="row">
-        <!-- 1st column -->
-        <div class="col-lg-9">
-            {block content}{/block}
-        </div>
-
-        <!-- 2nd column -->
-        <div class="col-lg-3">
-            {include "sidebar.latte"}
-        </div>
-    </div>
-</div>
+    {block content}{/block}
+    <span id="main-end" hidden></span>
+</main>
 
 <!-- COOKIES -->
 {include "utils/cookiealert.latte"}
 <!-- /COOKIES -->
 
-<footer class="footer d-md-flex">
-    <div>
-        &copy; {$config["website_title"]} {date("Y")}
+<footer class="site-footer">
+    <div class="footer-grid">
+        <div class="footer-col footer-brand">
+            <a class="brand" href=".">
+                <img src="img/icons/defaulticon-64.png" width="26" height="26" alt="">
+                <span class="brand-name">{$config["nav_brand"]}</span>
+            </a>
+            <p class="footer-address">
+                <a href="ts3server://{$config["query_displayip"]|escapeUrl}" class="mono">{$config["query_displayip"]}</a>
+            </p>
+        </div>
 
-        {if $config["imprint_enabled"]}
-            &mdash; <a href="{$config["imprint_url"]}">imprint</a>
-        {/if}
+        <nav class="footer-col" aria-label="{_"FOOTER_SECTIONS"}">
+            <p class="footer-title">{_"FOOTER_SECTIONS"}</p>
+            <ul>
+                <li><a href=".">{_"HOME_TITLE"}</a></li>
+                <li n:foreach="$navItems as $item"><a href="{$item[0]}">{_$item[1]}</a></li>
+            </ul>
+        </nav>
+
+        <div class="footer-col">
+            <p class="footer-title">TeamSpeak</p>
+            <ul>
+                <li><a href="ts3server://{$config["query_displayip"]|escapeUrl}">{_"CONNECT_BUTTON"}</a></li>
+                <li><a href="https://teamspeak.com/downloads/" target="_blank" rel="noopener">{_"FOOTER_DOWNLOAD_TS"}{icon("arrow-up-right", "i-sm")}</a></li>
+                <li n:if="$config['imprint_enabled']"><a href="{$config["imprint_url"]}">{_"FOOTER_IMPRINT"}</a></li>
+            </ul>
+        </div>
+
+        <div class="footer-col">
+            <p class="footer-title">{_"THEME_LABEL"}</p>
+            <div class="theme-switch" role="group" aria-label="{_"THEME_LABEL"}">
+                <button type="button" data-theme-set="auto" aria-pressed="false">{icon("circle-half", "i-sm")}{_"THEME_AUTO"}</button>
+                <button type="button" data-theme-set="light" aria-pressed="false">{icon("sun", "i-sm")}{_"THEME_LIGHT"}</button>
+                <button type="button" data-theme-set="dark" aria-pressed="false">{icon("moon", "i-sm")}{_"THEME_DARK"}</button>
+            </div>
+        </div>
     </div>
-    <div class="ml-auto footer-copyright">
-        <!-- Please respect the amount of work we've put for free into this project and leave the authors in the footer. Thanks! -->
-        <a href="https://github.com/Wruczek/ts-website" target="_blank">ts-website</a> v {\__TSWEBSITE_VERSION} &mdash;
-        &copy; <a href="https://wruczek.tech/?source=tsw" target="_blank">Wruczek</a> 2017 - 2025
+
+    <div class="footer-bottom">
+        <span>&copy; {date("Y")} {$config["website_title"]}</span>
+
+        <span class="footer-credit">
+            <!-- Please respect the amount of work we've put for free into this project and leave the authors in the footer. Thanks! -->
+            <a href="https://github.com/Wruczek/ts-website" target="_blank" rel="noopener">ts-website</a> v {\__TSWEBSITE_VERSION} &middot;
+            &copy; <a href="https://wruczek.tech/?source=tsw" target="_blank" rel="noopener">Wruczek</a> 2017 - 2025
+        </span>
     </div>
 </footer>
+
+</div>
+
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
 <!-- JAVASCRIPT -->
 
 <script>
-    // Simple error handler
+    // Show script errors as a small notice instead of a blocking alert()
     window.onerror = function (msg, url, linenumber) {
-        // TODO: log to acp and deal with it, also better display (notification?)
-        alert('Javascript error occurred: ' + msg + '\nURL: ' + url + '\nLine Number: ' + linenumber);
+        var stack = document.getElementById("toast-stack")
+
+        if (stack) {
+            var note = document.createElement("div")
+            var body = document.createElement("div")
+            var detail = document.createElement("small")
+
+            note.className = "toast-note"
+            note.setAttribute("role", "alert")
+            body.className = "toast-note-body"
+            body.textContent = {_"JS_ERROR_NOTICE"}
+            detail.textContent = msg + " (" + (url || "").split("/").pop() + ":" + linenumber + ")"
+
+            body.appendChild(detail)
+            note.innerHTML = {icon("warning-circle")}
+            note.appendChild(body)
+            stack.appendChild(note)
+
+            setTimeout(function () { note.remove() }, 12000)
+        }
+
         return false // still run the default handler
     }
 </script>
@@ -193,7 +341,7 @@ $navActiveIndex = isset($navActiveIndex) ? (int) $navActiveIndex : 0;
 {if $dayjslang !== null && $dayjslang !== "en"}
     {$tplutils::includeScript("{cdnjs}/dayjs/1.10.4/locale/$dayjslang.min.js")}
     <script>
-        dayjs.locale({$dayjslang} || navigator.languages || navigator.language)
+        window.dayjs && dayjs.locale({$dayjslang} || navigator.languages || navigator.language)
     </script>
 {/if}
 
@@ -203,6 +351,17 @@ $navActiveIndex = isset($navActiveIndex) ? (int) $navActiveIndex : 0;
 
 <!-- DataTables responsive plugin -->
 {$tplutils::includeScript("{cdnjs}/datatables-responsive/2.2.7/dataTables.responsive.min.js", "sha256-lNhDn9rWCvb7iB+apRL+bi4SsUrHKLopvY8lE5nscyI=")}
+
+<script>
+    var TSW_LANG = {
+        copied: {_"COPIED"},
+        copy_error: {_"FAQ_COPY_LINK_ERROR"},
+        unit_days: {_"UNIT_DAYS_SHORT"},
+        unit_hours: {_"UNIT_HOURS_SHORT"},
+        unit_minutes: {_"UNIT_MINUTES_SHORT"},
+        unit_ms: {_"UNIT_MS"}
+    }
+</script>
 
 <!-- script.js -->
 {$tplutils::includeScript("js/script.js", true)}

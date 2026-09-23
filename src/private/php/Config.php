@@ -55,6 +55,13 @@ class Config {
                 $db = DatabaseUtils::i()->getDb();
                 $data = $db->select("config", ["identifier", "type", "value"]);
             } catch (\Exception $e) {
+                // The error template reads the config again; an empty config stops it from coming back here
+                $this->config = [];
+
+                if (!headers_sent()) {
+                    http_response_code(503);
+                }
+
                 TemplateUtils::i()->renderErrorTemplate("DB error", "Cannot get config data from database", $e->getMessage());
                 exit;
             }

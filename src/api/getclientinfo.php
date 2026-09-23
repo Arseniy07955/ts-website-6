@@ -11,14 +11,17 @@ if (empty($_GET["cldbid"])) {
     $clientList = CacheManager::i()->getClientList();
     $clientData = null;
 
-    foreach ($clientList as $client) {
+    // null when the TeamSpeak server cannot be reached
+    foreach ($clientList ?? [] as $client) {
         if ($client["client_database_id"] === $cldbid) {
             $clientData = $client;
             break;
         }
     }
 
-    if ($clientData !== null) {
+    if ($clientList === null) {
+        $returnJson = ["success" => false, "message" => "Cannot get the client list"];
+    } else if ($clientData !== null) {
         $returnJson = [
             "success" => true,
             "timenow" => time(),

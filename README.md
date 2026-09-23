@@ -57,3 +57,10 @@ UPDATE config SET value = 'YOUR_API_KEY' WHERE identifier = 'query_password';
 I am happy to take any programming-related requests, add additional features or modify the code to suit your needs for a small donation :) I am experienced at Java, PHP, HTML, CSS, Javascript, SQL, server configurations etc.
 
 For business enquiries only: **wruczekk** at **gmail.com**, for anything else please join our [Telegram group](https://t.me/ts-website).
+
+#### Russian translation
+The Russian translation has been reviewed and completed. New installations get it automatically. To update an existing installation, run `src/installer/upgrade/ru-translations.sql` against the website database, replacing `DBPREFIX` with your table prefix (or removing it if you have none):
+```sh
+sed 's/DBPREFIX/tsw_/g' src/installer/upgrade/ru-translations.sql | mysql -u USER -p DATABASE
+```
+The script is safe to run more than once: it updates the existing Russian rows, adds the missing ones and also applies a few English grammar fixes. Translations are cached for up to 5 minutes (`cache_languages`), delete `src/private/cache/*.cache.php` to see the changes right away.

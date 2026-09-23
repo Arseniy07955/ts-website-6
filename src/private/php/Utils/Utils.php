@@ -107,7 +107,7 @@ class Utils {
      *             Falls back to REMOTE_ADDR if empty
      * @return string IP address
      */
-    public static function getClientIp(bool $useCfip = null): string {
+    public static function getClientIp(?bool $useCfip = null): string {
         if ($useCfip === null) {
             $useCfip = Config::get("usingcloudflare");
         }

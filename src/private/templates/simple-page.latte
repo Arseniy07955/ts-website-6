@@ -1,13 +1,50 @@
 {extends "body.latte"}
 {var $title = $pagetitle}
+{var $flushPage = true}
 
 {block content}
-<div class="card card-accent">
-    <div class="card-header bigger-title">
-        {$paneltitle|noescape}
-    </div>
-    <div class="card-body">
-        {$panelcontent|noescape}
-    </div>
+<header class="section page-hero reveal">
+    <h1 class="page-title">{$paneltitle|noescape}</h1>
+</header>
+
+<div class="split">
+    <article class="split-main reveal" style="--i: 1">
+        <div class="prose" data-toc-source>
+            {$panelcontent|noescape}
+        </div>
+    </article>
+
+    <aside class="split-side reveal" style="--i: 2">
+        {* Filled by js/script.js from the headings of the text; stays hidden for short pages *}
+        <nav class="side-block toc-block" aria-labelledby="toc-title" hidden>
+            <div class="side-head">
+                <h2 class="side-title" id="toc-title">{_"PAGE_TOC_TITLE"}</h2>
+            </div>
+            <ol class="toc" data-toc></ol>
+        </nav>
+
+        <section class="side-block" aria-labelledby="help-title">
+            <div class="side-head">
+                <h2 class="side-title" id="help-title">{_"PAGE_HELP_TITLE"}</h2>
+            </div>
+
+            <ol class="howto">
+                <li>
+                    <span class="howto-icon" aria-hidden="true">{icon("question")}</span>
+                    <div>
+                        <p class="howto-title">{_"PAGE_HELP_FAQ"}</p>
+                        <a class="howto-link" href="faq.php">{_"NAV_FAQ"}{icon("arrow-right", "i-sm")}</a>
+                    </div>
+                </li>
+                <li>
+                    <span class="howto-icon" aria-hidden="true">{icon("headset")}</span>
+                    <div>
+                        <p class="howto-title">{_"PAGE_HELP_STAFF"}</p>
+                        <a class="howto-link mono" href="ts3server://{$config["query_displayip"]|escapeUrl}">{$config["query_displayip"]}</a>
+                    </div>
+                </li>
+            </ol>
+        </section>
+    </aside>
 </div>
 {/block}

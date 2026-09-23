@@ -1,103 +1,682 @@
-body {
-    margin-bottom: 40px;
+/*
+ * TS-website installer. The look comes from ../css/tsw.css (frame, header, cells, side blocks, howto,
+ * forms, buttons), this file lays out the step and adds the few things only the installer needs.
+ */
+
+.installer-version {
+    color: var(--text-3);
+    font-size: 14px;
+    white-space: nowrap;
 }
 
-h4 {
-    margin-bottom: 2rem !important;
+/* Layout: the website's split in the frame. The step's title, facts and form in the main column,
+   the list of steps and the notes for this step in the side column, like a text page with its
+   table of contents. The list sits at the top of the column on every step, so between steps it
+   holds still while the page changes around it */
+
+.installer-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
 }
 
-.nav-wizard {
-    display: inline-block;
-    margin-bottom: 40px;
+.installer-main {
+    min-width: 0;
 }
 
-.nav-wizard > li {
+.installer-side {
+    min-width: 0;
+    border-left: 1px solid var(--line);
+}
+
+.installer-head {
+    padding: 56px var(--pad-x) 48px;
+    border-bottom: 1px solid var(--line);
+}
+
+.installer-head .page-title {
+    max-width: 640px;
+}
+
+.installer-head .page-sub {
+    max-width: 600px;
+}
+
+.installer-body {
+    padding: 48px var(--pad-x) 72px;
+}
+
+.installer-body > :first-child {
+    margin-top: 0;
+}
+
+/* Where the step stands, in the chip where the home page shows the server state */
+.step-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 28px;
+    padding: 6px 12px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius);
+    color: var(--text-2);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+}
+
+.step-meter {
+    display: flex;
+    gap: 3px;
+}
+
+.step-meter > span {
+    width: 10px;
+    height: 4px;
+    border-radius: 1px;
+    background: var(--bg-3);
+}
+
+.step-meter > .is-done {
+    background: var(--text-3);
+}
+
+.step-meter > .is-current {
+    background: var(--text);
+}
+
+/* Facts under the title: the website's row of cells. Nothing in them is cut, a long value wraps
+   inside its cell. By default the facts pair up with aligned hairlines. Where the main column is
+   760px or wider they share one row and each cell sizes to its content, so short facts keep their
+   width and the longer ones take the rest. Facts holding an address or a name that was typed
+   (.is-pairs: the TeamSpeak step and the finish screen) always pair up */
+.installer-facts {
+    display: flex;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--line);
+}
+
+.installer-facts > .cell {
+    flex: 1 1 calc(50% - 1px);
+}
+
+.installer-facts > .cell:nth-child(odd) {
+    padding-left: var(--pad-x);
+}
+
+/* The main column is 760px or wider from a 1200px window, and between 761px and 1000px, where it
+   takes the full width */
+@media (min-width: 1200px), (min-width: 761px) and (max-width: 1000px) {
+    .installer-facts:not(.is-pairs) > .cell {
+        flex-basis: auto;
+    }
+
+    .installer-facts:not(.is-pairs) > .cell:nth-child(odd):not(:first-child) {
+        padding-left: 24px;
+    }
+}
+
+.installer-facts dt,
+.installer-facts dd {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.installer-facts dd {
+    min-width: 0;
+    font-size: 19px;
+    line-height: 1.3;
+}
+
+.installer-facts .cell-text {
+    min-width: 0;
+}
+
+.installer-facts dd.mono {
+    font-size: 16px;
+    letter-spacing: 0;
+}
+
+/* The line under a value wraps to the cell's width instead of widening it */
+.installer-facts dd.cell-sub {
     display: block;
+    width: 0;
+    min-width: 100%;
+    font-size: 13px;
+    line-height: 1.45;
 }
 
-.nav-wizard > li > a {
+.installer-facts .cell-sub.mono {
+    font-size: 12.5px;
+}
+
+.installer-facts .of {
+    color: var(--text-3);
+}
+
+.state-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--text-3);
+}
+
+.state-dot.is-ok {
+    background: var(--live);
+}
+
+.state-dot.is-fail {
+    background: var(--danger);
+}
+
+@media (max-width: 1000px) {
+    .installer-page {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .installer-side {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+    }
+
+    /* Phones and tablets follow the chip over the title; the notes come after the form */
+    .steps-block {
+        display: none;
+    }
+
+    .installer-side > .side-block + .side-block {
+        border-top: 1px solid var(--line);
+    }
+
+    .installer-side > .steps-block + .side-block {
+        border-top: 0;
+    }
+
+    .installer-side:not(:has(.steps-block + .side-block)) {
+        display: none;
+    }
+}
+
+/* Phones: two facts per line with aligned hairlines, free text (a name, an address) on a line of its
+   own, and the pairs marked .cell-fit share a line only when both fit. Rows no longer start on odd
+   cells only, so every cell takes the page's left padding */
+@media (max-width: 640px) {
+    .installer-facts > .cell {
+        padding-left: var(--pad-x);
+    }
+
+    .installer-facts > .cell-wide,
+    .installer-facts.is-server > .cell:first-child {
+        flex-basis: 100%;
+    }
+
+    .installer-facts > .cell-fit {
+        flex-basis: auto;
+    }
+
+    .installer-version {
+        display: none;
+    }
+
+    .installer-head {
+        padding: 40px var(--pad-x) 36px;
+    }
+
+    .installer-body {
+        padding: 36px var(--pad-x) 56px;
+    }
+
+    .step-chip {
+        margin-bottom: 24px;
+    }
+}
+
+/* Steps: done ones carry a check, the current one a ring, the rest their number. A thread joins
+   the marks and is drawn solid up to the current step */
+
+.steps-count {
+    color: var(--text-3);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Its own view-transition group, like the website header: between steps the list holds still,
+   only the check or number that changed cross-fades in place while the ring travels */
+.stepper-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    view-transition-name: installer-steps;
+}
+
+.stepper-list li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 5px 0;
+    color: var(--text-3);
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.stepper-list li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: 33px;
+    bottom: -5px;
+    left: 13.5px;
+    width: 1px;
+    background: var(--line-2);
+}
+
+.stepper-list li.is-done::before {
+    background: var(--text-3);
+}
+
+.stepper-mark {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+}
+
+.stepper-mark .i {
+    width: 14px;
+    height: 14px;
+    vertical-align: 0;
+}
+
+.stepper-list .is-done {
+    color: var(--text-2);
+}
+
+.stepper-list .is-done .stepper-mark {
+    border-color: var(--line-2);
+    color: var(--text-2);
+}
+
+.stepper-list .is-current {
+    color: var(--text);
+    font-weight: 500;
+}
+
+.stepper-list .is-current .stepper-mark {
+    border-color: transparent;
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* The ring around the current step. It moves to the next step with the page transition, the way
+   the underline in the website's navigation travels between pages */
+.stepper-marker {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 28px;
+    height: 28px;
+    border: 1.5px solid var(--text);
+    border-radius: 8px;
+    view-transition-name: installer-step;
+}
+
+::view-transition-group(installer-step) {
+    animation-duration: 380ms;
+    animation-timing-function: var(--ease-in-out);
+}
+
+/* Notes next to the form */
+
+.installer .howto-title {
+    line-height: 1.5;
+}
+
+.howto-sub {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.howto-sub code {
+    color: var(--text-2);
+}
+
+.note-code {
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    overflow-x: auto;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    line-height: 1.55;
+}
+
+/* Query connections: one per line, the one picked in the form is marked the way the website's
+   table of contents marks the current section, and the mark follows the select */
+.mode-list {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mode-list li {
+    position: relative;
+    padding: 7px 0 7px 16px;
+    color: var(--text-2);
+    transition: color var(--dur-fast) ease;
+}
+
+.mode-list li::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    bottom: 9px;
+    left: 0;
+    width: 1px;
+    background: var(--line-2);
+    transition: background-color var(--dur-fast) ease;
+}
+
+.mode-list li.is-current {
+    color: var(--text);
+}
+
+.mode-list li.is-current::before {
+    width: 2px;
+    background: var(--text);
+}
+
+.mode-name {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.mode-port {
+    flex: none;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+}
+
+.mode-meta {
+    margin: 2px 0 0;
+    color: var(--text-3);
+    font-size: 13.5px;
+    line-height: 1.45;
+}
+
+/* Forms: labels above the fields, helper text under them */
+
+.installer .form-group {
+    margin-bottom: 24px;
+}
+
+.installer label {
     display: block;
-    padding: 10px 15px;
-    cursor: default;
-    text-decoration: none !important;
+    margin-bottom: 8px;
 }
 
-.btn {
-    font-family: Helvetica, Arial, sans-serif;
-    line-height: 12px;
+.installer .form-text {
+    margin-top: 8px;
+    line-height: 1.5;
 }
 
-p, label {
-    font-size: 115%;
+.installer .custom-control {
+    margin-bottom: 12px;
 }
 
-.license {
-    margin: 1rem auto;
+.installer .custom-control-label {
     display: inline-block;
-    max-height: 400px;
-    text-align: initial;
+    margin-bottom: 0;
+    font-weight: 400;
 }
 
-.license-container {
-    text-align: center;
+.installer .custom-control-label .form-text {
+    margin-top: 2px;
 }
 
-.fa-larger {
-    font-size: 1.5em;
+.installer .custom-select:hover {
+    border-color: var(--text-3);
 }
 
-.fa-chevron-left {
-    margin-right: 3px;
+.field-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 128px;
+    gap: 0 16px;
 }
 
-.fa-chevron-right, .fa-sync {
-    margin-left: 3px;
+@media (max-width: 640px) {
+    .field-row {
+        grid-template-columns: minmax(0, 1fr) 104px;
+    }
 }
 
-.requirements-check-table {
+/* A field that comes and goes (the query username, unused by WebQuery): the rows below
+   slide up instead of jumping */
+.field-collapse {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows var(--dur) var(--ease-out), opacity var(--dur-fast) ease, visibility 0s;
+}
+
+.field-collapse > div {
+    min-height: 0;
+    overflow: hidden;
+    /* room for the focus outline, which the clipping would cut off */
+    margin: -6px;
+    padding: 6px;
+}
+
+.field-collapse.is-hidden {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition: grid-template-rows var(--dur) var(--ease-out), opacity var(--dur-fast) ease, visibility 0s linear var(--dur);
+}
+
+/* Action bar at the end of every step */
+
+.installer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+}
+
+.installer-actions .btn-primary {
+    margin-left: auto;
+}
+
+/* Bootstrap paints a focused button in its own colors (blue primary, gray secondary) and its
+   ".btn-primary:focus" outranks the plain ".btn-primary" in tsw.css. Chrome focuses a button on
+   click, so every submitted step showed it. Keep ink and hairline in every state */
+.installer .btn-primary:focus,
+.installer .btn-primary.focus {
+    border-color: var(--ink);
+    background-color: var(--ink);
+    color: var(--ink-fg);
+}
+
+.installer .btn-primary:focus:hover {
+    border-color: var(--ink-hover);
+    background-color: var(--ink-hover);
+}
+
+.installer .btn-secondary:focus,
+.installer .btn-secondary.focus {
+    border-color: var(--line-2);
+    background-color: transparent;
+    color: var(--text);
+}
+
+.installer .btn-secondary:focus:hover {
+    background-color: var(--bg-2);
+}
+
+.installer .btn {
+    transition:
+        background-color var(--dur-fast) ease,
+        border-color var(--dur-fast) ease,
+        color var(--dur-fast) ease,
+        opacity var(--dur-fast) ease,
+        transform var(--dur-press) var(--ease-out);
+}
+
+/* While the server checks the database or TeamSpeak details (up to ten seconds) the
+   arrow turns into a spinner, so a slow answer does not look like a dead button */
+.btn .i-busy {
+    display: none;
+}
+
+.btn.is-busy {
+    cursor: progress;
+}
+
+.btn.is-busy .i-busy {
     display: inline-block;
-    width: auto;
-    text-align: initial
+    animation: spin 800ms linear infinite;
 }
 
-.color-success {
-    color: #28B62C;
+.btn.is-busy .i-arrow,
+.btn.is-busy .i-retry {
+    display: none;
 }
 
-.color-warning {
-    color: #FF851B;
+.btn .i-retry {
+    transition: transform var(--dur) var(--ease-out);
 }
 
-.color-danger {
-    color: #FF4136;
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .btn:hover .i-retry {
+        transform: rotate(40deg);
+    }
 }
 
-.whatnow-row {
-    margin-bottom: 30px;
+/* Requirements check */
+
+.check-summary {
+    margin-bottom: 24px;
 }
 
-.whatnow-row h1, .whatnow-row h3 {
+.details-toggle .caret {
+    transition: transform var(--dur) var(--ease-out);
+}
+
+.details-toggle[aria-expanded="true"] .caret {
+    transform: rotate(180deg);
+}
+
+.check-details.collapsing {
+    transition: height var(--dur) var(--ease-out);
+}
+
+.check-details-inner {
+    padding-top: 32px;
+}
+
+.check-group + .check-group {
+    margin-top: 40px;
+}
+
+.check-group-title {
+    margin: 0 0 12px;
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -.01em;
+}
+
+.installer .rows .row-label {
+    color: var(--text);
+}
+
+.check-state {
+    display: flex;
+    gap: 10px;
+    color: var(--text-2);
+    font-size: 15px;
+}
+
+.check-state .i {
+    margin-top: 4px;
+}
+
+.check-ok .i {
+    color: var(--live);
+}
+
+.check-warn .i {
+    color: var(--away);
+}
+
+.check-fail {
+    color: var(--text);
+}
+
+.check-fail .i {
+    color: var(--danger);
+}
+
+.alert pre {
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    background: var(--bg);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Icon sync after the TeamSpeak step */
+
+.sync-state {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--text-2);
+}
+
+.sync-state .loader {
+    position: static;
+    flex: none;
     margin: 0;
 }
 
-.whatnow-icon {
-    font-size: 5rem;
+/* Finish */
+
+.installer .rows a {
+    font-weight: 500;
 }
 
-.tooltip-inner {
-    max-width: 300px;
-}
-
-@media (max-width: 1200px) {
-    .nav-wizard > li:not(:first-child) > a:before {
-        border: 0;
+@media (prefers-reduced-motion: reduce) {
+    .field-collapse,
+    .field-collapse.is-hidden {
+        transition-property: opacity, visibility;
     }
 
-    .nav-wizard {
-        width: 100%;
+    .check-details.collapsing {
+        transition: none;
     }
 
-    .nav-wizard > li {
-        float: none;
+    .details-toggle .caret {
+        transition: none;
+    }
+
+    .btn.is-busy .i-busy {
+        animation-duration: 3s;
     }
 }
