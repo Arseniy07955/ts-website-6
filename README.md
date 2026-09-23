@@ -31,17 +31,24 @@
 - Free and Open source, under GPL-3.0
 
 #### TeamSpeak 6 support
-TeamSpeak 6 servers have no raw ServerQuery (port 10011) anymore, only SSH and HTTP query.
-TS-website connects to them over **SSH query** (default port `10022`, powered by phpseclib - no PHP extension needed).
+TeamSpeak 6 servers have no raw ServerQuery (port 10011) anymore, only SSH and HTTP(S) query.
+TS-website can connect using any of them - pick the **query mode** in the installer:
 
-1. Enable SSH query on the TS6 server: `--query-ssh-enable` or `TSSERVER_QUERY_SSH_ENABLED=1`
-2. Run `composer install` in `src` (new dependency: `phpseclib/phpseclib`)
-3. In the installer, enter query port `10022` and tick **"Use SSH query"**
+| Mode    | Default port | Login                          |
+|---------|--------------|--------------------------------|
+| `raw`   | 10011        | query username + password (TS3 only) |
+| `ssh`   | 10022        | query username + password      |
+| `http`  | 10080        | API key (entered as password)  |
+| `https` | 10443        | API key (entered as password)  |
 
-Already installed? Switch an existing install to SSH query in the database (add your table prefix to `config` if you set one):
+- SSH: enable it with `--query-ssh-enable` / `TSSERVER_QUERY_SSH_ENABLED=1`. Uses phpseclib, no PHP extension needed - run `composer install` in `src`.
+- HTTP: enable it with `--query-http-enable` / `TSSERVER_QUERY_HTTP_ENABLED=1`, the API key is set with `TSSERVER_QUERY_ADMIN_API_KEY`.
+
+Already installed? Switch an existing install in the database (add your table prefix to `config` if you set one):
 ```sql
-INSERT INTO config (identifier, type, value) VALUES ('query_ssh', 'BOOL', 'true');
-UPDATE config SET value = '10022' WHERE identifier = 'query_port';
+INSERT INTO config (identifier, type, value) VALUES ('query_mode', 'STRING', 'http');
+UPDATE config SET value = '10080' WHERE identifier = 'query_port';
+UPDATE config SET value = 'YOUR_API_KEY' WHERE identifier = 'query_password';
 ```
 
 ### Other stuff

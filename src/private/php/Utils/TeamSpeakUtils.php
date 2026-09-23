@@ -3,6 +3,7 @@
 namespace Wruczek\TSWebsite\Utils;
 
 use Wruczek\TSWebsite\Config;
+use Wruczek\TSWebsite\Query\HttpServerQueryAdapter;
 use Wruczek\TSWebsite\Query\SshServerQueryAdapter;
 
 /**
@@ -34,10 +35,10 @@ class TeamSpeakUtils {
             $queryport = $this->configUtils->getValue("query_port");
             $username = $this->configUtils->getValue("query_username");
             $password = $this->configUtils->getValue("query_password");
-            $ssh = (bool) $this->configUtils->getValue("query_ssh", false);
+            $mode = $this->configUtils->getValue("query_mode", "raw");
 
             try {
-                $this->tsNodeHost = self::connect($hostname, $queryport, $username, $password, $ssh, 3);
+                $this->tsNodeHost = self::connect($mode, $hostname, $queryport, $username, $password, 3);
             } catch (\Exception $e) {
                 $this->addExceptionToExceptionsList($e);
             }
@@ -48,36 +49,56 @@ class TeamSpeakUtils {
 
     /**
      * Connects and logs in to the ServerQuery.
-     * @param bool $ssh use SSH query (required for TeamSpeak 6, default port 10022)
-     *                  instead of the raw TCP query (TeamSpeak 3, default port 10011)
+     * @param string $mode "raw" - raw TCP query (TeamSpeak 3, default port 10011),
+     *                     "ssh" - SSH query (TeamSpeak 3/6, default port 10022),
+     *                     "http"/"https" - WebQuery (TeamSpeak 3/6, default port 10080/10443),
+     *                     $password is the API key then and $username is ignored
      * @throws \Exception when connection or login fails
      */
-    public static function connect(string $hostname, int $queryport, string $username, string $password,
-                                   bool $ssh = false, int $timeout = 10): \TeamSpeak3_Node_Host {
-        if (!$ssh) {
-            $tsNodeHost = \TeamSpeak3::factory("serverquery://$hostname:$queryport/?timeout=$timeout");
-            $tsNodeHost->login($username, $password);
-            return $tsNodeHost;
+    public static function connect(string $mode, string $hostname, int $queryport, string $username,
+                                   string $password, int $timeout = 10): \TeamSpeak3_Node_Host {
+        switch ($mode) {
+            case "raw":
+                $tsNodeHost = \TeamSpeak3::factory("serverquery://$hostname:$queryport/?timeout=$timeout");
+                $tsNodeHost->login($username, $password);
+                return $tsNodeHost;
+
+            case "ssh":
+                $adapter = new SshServerQueryAdapter([
+                    "host" => $hostname,
+                    "port" => $queryport,
+                    "timeout" => $timeout,
+                    "blocking" => 1,
+                    "username" => $username,
+                    "password" => $password,
+                ]);
+
+                $tsNodeHost = $adapter->getHost();
+
+                // SSH already authenticated us, but login again so the framework
+                // stores the credentials. Some servers refuse a second login, that's fine.
+                try {
+                    $tsNodeHost->login($username, $password);
+                } catch (\TeamSpeak3_Adapter_ServerQuery_Exception $e) {}
+
+                return $tsNodeHost;
+
+            case "http":
+            case "https":
+                $adapter = new HttpServerQueryAdapter([
+                    "host" => $hostname,
+                    "port" => $queryport,
+                    "timeout" => $timeout,
+                    "blocking" => 1,
+                    "https" => $mode === "https",
+                    "apikey" => $password,
+                ]);
+
+                return $adapter->getHost();
+
+            default:
+                throw new \InvalidArgumentException("Unknown query mode: $mode");
         }
-
-        $adapter = new SshServerQueryAdapter([
-            "host" => $hostname,
-            "port" => $queryport,
-            "timeout" => $timeout,
-            "blocking" => 1,
-            "username" => $username,
-            "password" => $password,
-        ]);
-
-        $tsNodeHost = $adapter->getHost();
-
-        // SSH already authenticated us, but login again so the framework
-        // stores the credentials. Some servers refuse a second login, that's fine.
-        try {
-            $tsNodeHost->login($username, $password);
-        } catch (\TeamSpeak3_Adapter_ServerQuery_Exception $e) {}
-
-        return $tsNodeHost;
     }
 
     /**

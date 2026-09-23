@@ -13,7 +13,12 @@ if (!empty($_POST)) {
     $queryusername = trim($_POST["queryusername"]);
     $querypassword = trim($_POST["querypassword"]);
     $querydisplayip = trim($_POST["querydisplayip"]);
-    $queryssh = !empty($_POST["queryssh"]);
+    $querymode = in_array($_POST["querymode"] ?? "", ["raw", "ssh", "http", "https"], true) ? $_POST["querymode"] : "raw";
+
+    // WebQuery authenticates with the API key only
+    if (($querymode === "http" || $querymode === "https") && empty($queryusername)) {
+        $queryusername = "serveradmin";
+    }
 
     if (!empty($queryhostname) && !empty($queryport)
         && !empty($queryserverport) && !empty($queryusername)
@@ -22,7 +27,7 @@ if (!empty($_POST)) {
         require_once __PRIVATE_DIR . "/vendor/autoload.php";
 
         try {
-            $tsNodeHost = TeamSpeakUtils::connect($queryhostname, (int) $queryport, $queryusername, $querypassword, $queryssh);
+            $tsNodeHost = TeamSpeakUtils::connect($querymode, $queryhostname, (int) $queryport, $queryusername, $querypassword);
             $tsServer = $tsNodeHost->serverGetByPort($queryserverport);
 
             if(is_array($tsServer->getInfo())) {
@@ -39,7 +44,7 @@ if (!empty($_POST)) {
                     $configdata = [
                         "query_hostname" => $queryhostname,
                         "query_port" => $queryport,
-                        "query_ssh" => $queryssh,
+                        "query_mode" => $querymode,
                         "tsserver_port" => $queryserverport,
                         "query_username" => $queryusername,
                         "query_password" => $querypassword,
@@ -188,27 +193,33 @@ if (isset($_GET["syncicons"])) {
                     </div>
 
                     <p class="text-muted text-center" style="font-size: 100%">
-                        Default query port: 10011 (TS3) or 10022 (SSH, TS6), default server port: 9987.
+                        Default server port: 9987. Default query port: 10011 (raw),
+                        10022 (SSH), 10080 (HTTP), 10443 (HTTPS).
                     </p>
 
-                    <div class="custom-control custom-checkbox mb-2">
-                        <input type="checkbox" class="custom-control-input" id="queryssh" name="queryssh" value="1">
-                        <label class="custom-control-label" for="queryssh">
-                            Use SSH query (required for <b>TeamSpeak 6</b>)
-                        </label>
+                    <div class="input-group mb-2">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text"><i class="fa fa-plug fa-fw"></i></span>
+                        </div>
+                        <select class="form-control" name="querymode" id="querymode">
+                            <option value="raw">Raw query (TeamSpeak 3)</option>
+                            <option value="ssh">SSH query (TeamSpeak 3 / 6)</option>
+                            <option value="http">HTTP WebQuery (TeamSpeak 3 / 6)</option>
+                            <option value="https">HTTPS WebQuery (TeamSpeak 3 / 6)</option>
+                        </select>
                     </div>
 
                     <p class="text-muted text-center" style="font-size: 100%">
-                        TeamSpeak 6 has no raw query anymore, only SSH (port 10022) and HTTP.
-                        Make sure SSH query is enabled on the server (<code>--query-ssh-enable</code>
-                        or <code>TSSERVER_QUERY_SSH_ENABLED=1</code>).
+                        <b>TeamSpeak 6</b> has no raw query anymore - use SSH or HTTP.
+                        For WebQuery enter the <b>API key</b> as the password
+                        (<code>TSSERVER_QUERY_ADMIN_API_KEY</code>), the username is not used.
                     </p>
 
                     <div class="input-group mb-2">
                         <div class="input-group-prepend">
                             <span class="input-group-text"><i class="fa fa-user fa-fw"></i></span>
                         </div>
-                        <input class="form-control" name="queryusername" placeholder="Query username" required autocomplete="off">
+                        <input class="form-control" name="queryusername" id="queryusername" placeholder="Query username" required autocomplete="off">
                         <div class="input-group-append">
                             <span class="input-group-text" data-toggle="tooltip" title="Its recommended to create special user account instead of serveradmin">
                                 <i class="fa fa-exclamation-triangle color-danger fa-fw"></i>
@@ -220,7 +231,7 @@ if (isset($_GET["syncicons"])) {
                         <div class="input-group-prepend">
                             <span class="input-group-text"><i class="fa fa-lock fa-fw"></i></span>
                         </div>
-                        <input type="password" class="form-control" name="querypassword" placeholder="Query password" required autocomplete="off">
+                        <input type="password" class="form-control" name="querypassword" id="querypassword" placeholder="Query password" required autocomplete="off">
                     </div>
 
                     <div class="input-group mb-2">
@@ -255,6 +266,12 @@ if (isset($_GET["syncicons"])) {
 <?php } ?>
 
 <script>
+    $("#querymode").change(function () {
+        var webQuery = this.value === "http" || this.value === "https"
+        $("#queryusername").prop("required", !webQuery).closest(".input-group").toggle(!webQuery)
+        $("#querypassword").attr("placeholder", webQuery ? "API key" : "Query password")
+    })
+
     $("#submitformalt").click(function () {
         $("#submitform").click();
     });
