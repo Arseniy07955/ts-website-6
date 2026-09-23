@@ -11,7 +11,8 @@
         "planetteamspeak/ts3-php-framework": "1.1.35",
         "latte/latte": "^2.11",
         "wruczek/php-file-cache": "^0",
-        "catfan/medoo": "~1.7.10"
+        "catfan/medoo": "~1.7.10",
+        "phpseclib/phpseclib": "~3.0"
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest"

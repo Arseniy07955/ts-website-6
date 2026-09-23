@@ -4,6 +4,7 @@ if(!defined("__TSWEBSITE_VERSION")) die("Direct access not allowed");
 use Wruczek\TSWebsite\Config;
 use Wruczek\TSWebsite\ServerIconCache;
 use Wruczek\TSWebsite\Utils\ApiUtils;
+use Wruczek\TSWebsite\Utils\TeamSpeakUtils;
 
 if (!empty($_POST)) {
     $queryhostname = trim($_POST["queryhostname"]);
@@ -12,6 +13,7 @@ if (!empty($_POST)) {
     $queryusername = trim($_POST["queryusername"]);
     $querypassword = trim($_POST["querypassword"]);
     $querydisplayip = trim($_POST["querydisplayip"]);
+    $queryssh = !empty($_POST["queryssh"]);
 
     if (!empty($queryhostname) && !empty($queryport)
         && !empty($queryserverport) && !empty($queryusername)
@@ -20,15 +22,15 @@ if (!empty($_POST)) {
         require_once __PRIVATE_DIR . "/vendor/autoload.php";
 
         try {
-            $tsNodeHost = TeamSpeak3::factory("serverquery://$queryhostname:$queryport/");
-            $tsNodeHost->login($queryusername, $querypassword);
+            $tsNodeHost = TeamSpeakUtils::connect($queryhostname, (int) $queryport, $queryusername, $querypassword, $queryssh);
             $tsServer = $tsNodeHost->serverGetByPort($queryserverport);
 
             if(is_array($tsServer->getInfo())) {
                 $tsVersion = $tsServer->getInfo()["virtualserver_version"];
                 $tsBuildNo = $tsVersion->section("[", 1)->filterDigits()->toInt();
+                $isTs6OrNewer = (int) $tsVersion->filterDigits()->substr(0, 1)->toString() >= 6;
 
-                if ($tsBuildNo < 1564054246) {
+                if (!$isTs6OrNewer && $tsBuildNo < 1564054246) {
                     $errormessage =
                         'Your TeamSpeak server version is not supported.<br>' .
                         'Current version: ' . TeamSpeak3_Helper_Convert::versionShort($tsVersion) . ' (build ' . $tsBuildNo . ')' . '<br>' .
@@ -37,6 +39,7 @@ if (!empty($_POST)) {
                     $configdata = [
                         "query_hostname" => $queryhostname,
                         "query_port" => $queryport,
+                        "query_ssh" => $queryssh,
                         "tsserver_port" => $queryserverport,
                         "query_username" => $queryusername,
                         "query_password" => $querypassword,
@@ -185,7 +188,20 @@ if (isset($_GET["syncicons"])) {
                     </div>
 
                     <p class="text-muted text-center" style="font-size: 100%">
-                        Default query port: 10011, default server port: 9987.
+                        Default query port: 10011 (TS3) or 10022 (SSH, TS6), default server port: 9987.
+                    </p>
+
+                    <div class="custom-control custom-checkbox mb-2">
+                        <input type="checkbox" class="custom-control-input" id="queryssh" name="queryssh" value="1">
+                        <label class="custom-control-label" for="queryssh">
+                            Use SSH query (required for <b>TeamSpeak 6</b>)
+                        </label>
+                    </div>
+
+                    <p class="text-muted text-center" style="font-size: 100%">
+                        TeamSpeak 6 has no raw query anymore, only SSH (port 10022) and HTTP.
+                        Make sure SSH query is enabled on the server (<code>--query-ssh-enable</code>
+                        or <code>TSSERVER_QUERY_SSH_ENABLED=1</code>).
                     </p>
 
                     <div class="input-group mb-2">

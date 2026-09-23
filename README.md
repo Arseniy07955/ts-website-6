@@ -30,6 +30,20 @@
 - Caching
 - Free and Open source, under GPL-3.0
 
+#### TeamSpeak 6 support
+TeamSpeak 6 servers have no raw ServerQuery (port 10011) anymore, only SSH and HTTP query.
+TS-website connects to them over **SSH query** (default port `10022`, powered by phpseclib - no PHP extension needed).
+
+1. Enable SSH query on the TS6 server: `--query-ssh-enable` or `TSSERVER_QUERY_SSH_ENABLED=1`
+2. Run `composer install` in `src` (new dependency: `phpseclib/phpseclib`)
+3. In the installer, enter query port `10022` and tick **"Use SSH query"**
+
+Already installed? Switch an existing install to SSH query in the database (add your table prefix to `config` if you set one):
+```sql
+INSERT INTO config (identifier, type, value) VALUES ('query_ssh', 'BOOL', 'true');
+UPDATE config SET value = '10022' WHERE identifier = 'query_port';
+```
+
 ### Other stuff
 I am happy to take any programming-related requests, add additional features or modify the code to suit your needs for a small donation :) I am experienced at Java, PHP, HTML, CSS, Javascript, SQL, server configurations etc.
 
