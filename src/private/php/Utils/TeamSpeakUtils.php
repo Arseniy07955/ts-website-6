@@ -57,6 +57,10 @@ class TeamSpeakUtils {
      */
     public static function connect(string $mode, string $hostname, int $queryport, string $username,
                                    string $password, int $timeout = 10): \TeamSpeak3_Node_Host {
+        // registers the framework autoloader, TeamSpeak3::factory() does this
+        // on its own but the SSH and HTTP adapters are created directly
+        \TeamSpeak3::init();
+
         switch ($mode) {
             case "raw":
                 $tsNodeHost = \TeamSpeak3::factory("serverquery://$hostname:$queryport/?timeout=$timeout");
