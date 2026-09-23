@@ -110,6 +110,11 @@ class ServerIconCache {
                 return [];
             }
 
+            // WebQuery API keys have no access to file transfer commands (TS6), skip icons then
+            if ($e->getCode() === 5120) { // out of scope
+                return [];
+            }
+
             throw $e;
         }
     }

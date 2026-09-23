@@ -30,6 +30,29 @@
 - Caching
 - Free and Open source, under GPL-3.0
 
+#### TeamSpeak 6 support
+TeamSpeak 6 servers have no raw ServerQuery (port 10011) anymore, only SSH and HTTP(S) query.
+TS-website can connect using any of them - pick the **query mode** in the installer:
+
+| Mode    | Default port | Login                          |
+|---------|--------------|--------------------------------|
+| `raw`   | 10011        | query username + password (TS3 only) |
+| `ssh`   | 10022        | query username + password      |
+| `http`  | 10080        | API key (entered as password)  |
+| `https` | 10443        | API key (entered as password)  |
+
+- SSH: enable it with `--query-ssh-enable` / `TSSERVER_QUERY_SSH_ENABLED=1`. Uses phpseclib, no PHP extension needed - run `composer install` in `src`.
+- HTTP: enable it with `--query-http-enable` / `TSSERVER_QUERY_HTTP_ENABLED=1`, the API key is set with `TSSERVER_QUERY_ADMIN_API_KEY`.
+  Server/channel icons are not available over WebQuery (file transfer commands are out of the API key scope), the website works without them.
+- **Add the website server IP to `query_ip_allowlist.txt`**, otherwise TS flood protection will temporarily ban it. If TS-website runs on the same host as a TS server in Docker, add the Docker network gateway (e.g. `172.18.0.0/16`), not only `127.0.0.1`. TS6 reloads this file without a restart.
+
+Already installed? Switch an existing install in the database (add your table prefix to `config` if you set one):
+```sql
+INSERT INTO config (identifier, type, value) VALUES ('query_mode', 'STRING', 'http');
+UPDATE config SET value = '10080' WHERE identifier = 'query_port';
+UPDATE config SET value = 'YOUR_API_KEY' WHERE identifier = 'query_password';
+```
+
 ### Other stuff
 I am happy to take any programming-related requests, add additional features or modify the code to suit your needs for a small donation :) I am experienced at Java, PHP, HTML, CSS, Javascript, SQL, server configurations etc.
 
