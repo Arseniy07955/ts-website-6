@@ -43,6 +43,8 @@ TS-website can connect using any of them - pick the **query mode** in the instal
 
 - SSH: enable it with `--query-ssh-enable` / `TSSERVER_QUERY_SSH_ENABLED=1`. Uses phpseclib, no PHP extension needed - run `composer install` in `src`.
 - HTTP: enable it with `--query-http-enable` / `TSSERVER_QUERY_HTTP_ENABLED=1`, the API key is set with `TSSERVER_QUERY_ADMIN_API_KEY`.
+  Server/channel icons are not available over WebQuery (file transfer commands are out of the API key scope), the website works without them.
+- **Add the website server IP to `query_ip_allowlist.txt`**, otherwise TS flood protection will temporarily ban it. If TS-website runs on the same host as a TS server in Docker, add the Docker network gateway (e.g. `172.18.0.0/16`), not only `127.0.0.1`. TS6 reloads this file without a restart.
 
 Already installed? Switch an existing install in the database (add your table prefix to `config` if you set one):
 ```sql
