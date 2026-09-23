@@ -326,7 +326,8 @@ EOD;
     }
 
     private function collectOccupiedChannels(TeamSpeakChannel $channel, array $parents, array &$result): void {
-        if (!$channel->isSpacer() && !$this->isHiddenChannel($channel)) {
+        // Spacers can hold people too (e.g. "[spacer0]files"), empty ones are skipped below
+        if (!$this->isHiddenChannel($channel)) {
             $clients = [];
 
             foreach ($channel->getChannelMembers($this->renderQueryClients) as $member) {
