@@ -42,7 +42,8 @@ $(function () {
 
                 badges.eq(2).text(data.uptimeFormatted)
 
-                badges.eq(3).html(data.version + " on " + getPlatformIcon(data.platform))
+                // TS6 does not report the platform
+                badges.eq(3).html(data.platform ? data.version + " on " + getPlatformIcon(data.platform) : data.version)
                 updateTooltipWithTranslation(badges.eq(3), data.version, data.platform)
 
                 badges.eq(4).text(Math.round(data.averagePing * 100) / 100 + " ms")

@@ -121,7 +121,17 @@ class Utils {
             return $_SERVER["HTTP_CF_CONNECTING_IP"];
         }
 
-        return $_SERVER["REMOTE_ADDR"];
+        $ip = $_SERVER["REMOTE_ADDR"];
+
+        // When the website is hosted in the same network as its visitors (e.g. at home),
+        // they come from a private address, but the TS server sees the public one
+        $lanPublicIp = Config::get("lan_public_ip");
+
+        if (!empty($lanPublicIp) && !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return (string) $lanPublicIp;
+        }
+
+        return $ip;
     }
 
     /**
